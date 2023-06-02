@@ -4,7 +4,7 @@ hascode = true
 date = Date(2023, 4, 28)
 rss = "RSS feed not set up yet. Apologies!"
 
-tags = ["C++", "Optimization"]
+tags = ["C++", "optimization", "profiling", "perf"]
 +++
 
 # Introduction
