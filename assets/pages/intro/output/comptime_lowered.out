@@ -1,0 +1,9 @@
+>>> TYPED CODE <<<
+#= none:1 =# @code_typed(factorial(Val(13))) = CodeInfo(
+1 ─     nothing::Nothing
+└──     return 6227020800
+) => Int64
+
+>>> BENCHMARK <<<
+LoadError: UndefVarError: `@btime` not defined
+in expression starting at none:1

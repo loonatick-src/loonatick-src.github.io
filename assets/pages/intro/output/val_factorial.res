@@ -1,0 +1,1 @@
+Test.DefaultTestSet("Comptime factorial", Any[], 13, false, false, true, 1.685714625985148e9, 1.68571462598669e9, false)

@@ -1,0 +1,2 @@
+#= none:2 =# @test_throws(DomainError, factorial(Val(-1))) = Test Passed
+      Thrown: DomainError

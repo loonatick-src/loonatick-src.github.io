@@ -1,0 +1,122 @@
+<!doctype html> <html lang=en > <meta charset=UTF-8 > <meta name=viewport  content="width=device-width, initial-scale=1"> <link rel=stylesheet  href="/libs/highlight/styles/github.min.css"> <link rel=stylesheet  href="/css/franklin.css"> <link rel=stylesheet  href="/css/compute_general.css"> <link rel=icon  href="/assets/favicon.png"> <title>Introduction</title> <header> <div class=blog-name ><a href="/">Compute General</a></div> <nav> <ul> <li><a href="/">Home</a> </ul> <img src="/assets/hamburger.svg" id=menu-icon > </nav> </header> <div class=franklin-content > <h1 id=computing_at_compile_time_in_julia_a_first_blog_post ><a href="#computing_at_compile_time_in_julia_a_first_blog_post" class=header-anchor >Computing at Compile Time in Julia – A First Blog Post</a></h1> <p>This is a short post on the <code>Val</code> data type in Julia and using it for computing at compile-time. Some familiarity with the Julia programming language is assumed. This is going to be a fairly short post intended to take this blog on a spin.</p> <h2 id=the_val_type ><a href="#the_val_type" class=header-anchor >The <code>Val</code> Type</a></h2> <p><code>Val</code> is a very interesting type. From the docs on <code>Val&#40;c&#41;</code>:</p> <blockquote> <p>Return <code>Val&#123;c&#125;&#40;&#41;</code>, which contains no run-time data. Types like this can be used to pass the information between functions through the value c, which must be an isbits value or a Symbol. The intent of this construct is to be able to dispatch on constants directly &#40;at compile time&#41; without having to test the value of the constant at run time.</p> </blockquote> <p>So, <code>Val</code> is a paramteric type with one type parameter, and there can only be one possible value of each concrete <code>Val&#123;T&#125;</code>. </p> <pre><code class="julia hljs"><span class=hljs-keyword >using</span> Test
+
+<span class=hljs-meta >@testset</span> <span class=hljs-string >&quot;Val types&quot;</span> <span class=hljs-keyword >begin</span>
+	<span class=hljs-meta >@test</span> typeof(<span class=hljs-built_in >Val</span>(<span class=hljs-number >7</span>)) &lt;: <span class=hljs-built_in >Val</span>
+	<span class=hljs-meta >@test</span> typeof(<span class=hljs-built_in >Val</span>(<span class=hljs-number >0xc0ffee</span>)) == <span class=hljs-built_in >Val</span>{<span class=hljs-number >0xc0ffee</span>}
+<span class=hljs-keyword >end</span></code></pre> <pre><code class="plaintext hljs">Test Summary: | Pass  Total  Time
+Val types     |    2      2  0.0s
+</code></pre> <p>A function that takes an argument of type <code>::Val&#123;N&#125;</code>, where <code>N</code> is some <code>isbits</code> value, can only be passed the value <code>Val&#40;N&#41;</code>. But, when I came across <code>Val</code> for the first time, the example in the docs did not quite aid my understanding.</p> <pre><code class="julia hljs"><span class=hljs-keyword >using</span> Test
+
+f(::<span class=hljs-built_in >Val</span>{<span class=hljs-literal >true</span>}) = <span class=hljs-string >&quot;Good&quot;</span>
+f(::<span class=hljs-built_in >Val</span>{<span class=hljs-literal >false</span>}) = <span class=hljs-string >&quot;Bad&quot;</span>
+
+<span class=hljs-meta >@testset</span> <span class=hljs-string >&quot;Passing values through Val&quot;</span> <span class=hljs-keyword >begin</span>
+	<span class=hljs-meta >@test</span> f(<span class=hljs-built_in >Val</span>(<span class=hljs-literal >true</span>)) == <span class=hljs-string >&quot;Good&quot;</span>
+	<span class=hljs-meta >@test</span> f(<span class=hljs-built_in >Val</span>(<span class=hljs-literal >false</span>)) == <span class=hljs-string >&quot;Bad&quot;</span>
+<span class=hljs-keyword >end</span></code></pre> <pre><code class="plaintext hljs">Test Summary:              | Pass  Total  Time
+Passing values through Val |    2      2  0.0s
+</code></pre> <p>So, I tried to check my understanding of the &quot;no-runtime data&quot; aspect of this type by implementing my own example – factorial. Keep in mind that factorial is just a toy example, but the principles demonstrated here should carry over to developing more sophisticated examples.</p> <pre><code class="julia hljs"><span class=hljs-keyword >using</span> Test
+
+<span class=hljs-keyword >import</span> Base: factorial
+
+factorial(::<span class=hljs-built_in >Val</span>{<span class=hljs-number >0</span>}) = <span class=hljs-number >1</span>
+factorial(::<span class=hljs-built_in >Val</span>{N}) <span class=hljs-keyword >where</span> {N} = N * factorial(<span class=hljs-built_in >Val</span>(N-<span class=hljs-number >1</span>))
+
+<span class=hljs-meta >@testset</span> <span class=hljs-string >&quot;Comptime factorial&quot;</span> <span class=hljs-keyword >begin</span>
+    ns = <span class=hljs-number >1</span>:<span class=hljs-number >13</span>
+    <span class=hljs-keyword >for</span> n <span class=hljs-keyword >in</span> ns
+        <span class=hljs-meta >@test</span> factorial(<span class=hljs-built_in >Val</span>(n)) == factorial(n)
+    <span class=hljs-keyword >end</span>
+<span class=hljs-keyword >end</span></code></pre> <pre><code class="plaintext hljs">Test Summary:      | Pass  Total  Time
+Comptime factorial |   13     13  0.0s
+</code></pre> <p>All right that&#39;s great and all, but how does one check whether the <code>Val</code> variant is doing the entire calculation at compile-time?</p> <h2 id=verification_inspect_lowered_code ><a href="#verification_inspect_lowered_code" class=header-anchor >Verification: Inspect Lowered Code</a></h2> <p>The various macros that allow inspection of lowered forms of your source code tell the story.</p> <pre><code class="julia hljs"><span class=hljs-keyword >using</span> InteractiveUtils  <span class=hljs-comment ># loaded by default in the REPL</span>
+
+<span class=hljs-meta >@show</span> <span class=hljs-meta >@code_typed</span> factorial(<span class=hljs-built_in >Val</span>(<span class=hljs-number >10</span>))</code></pre> <pre><code class="plaintext hljs">#= none:2 =# @code_typed(factorial(Val(10))) = CodeInfo(
+1 ─     return 3628800
+) =&gt; Int64
+</code></pre> <p>That&#39;s right, it compiles down to <code>return 3628800</code>. In case you are still skeptical, you can also inspect the assembly.</p> <pre><code class="julia hljs"><span class=hljs-meta >@code_native</span> factorial(<span class=hljs-built_in >Val</span>(<span class=hljs-number >10</span>))</code></pre>
+<pre><code class="plaintext hljs">	.text
+	.file	&quot;factorial&quot;
+	.globl	julia_factorial_1449            # -- Begin function julia_factorial_1449
+	.p2align	4, 0x90
+	.type	julia_factorial_1449,@function
+julia_factorial_1449:                   # @julia_factorial_1449
+; ┌ @ none:1 within `factorial`
+	.cfi_startproc
+# %bb.0:                                # %top
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset %rbp, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register %rbp
+	movl	$3628800, %eax                  # imm = 0x375F00
+	popq	%rbp
+	.cfi_def_cfa %rsp, 8
+	retq
+.Lfunc_end0:
+	.size	julia_factorial_1449, .Lfunc_end0-julia_factorial_1449
+	.cfi_endproc
+; └
+                                        # -- End function
+	.section	&quot;.note.GNU-stack&quot;,&quot;&quot;,@progbits
+</code></pre>
+<p>Ignore the sections and directives &#40;the symbols starting with <code>.</code> like <code>.text</code>, <code>.p2align</code> etc&#41;. The assembly corresponds to <code>movl &#36;3628800&#36;,
+&#37;eax</code> followed by <code>retq</code>, which is basically <code>return 3628800</code>.</p>
+<h2 id=verification_benchmarking ><a href="#verification_benchmarking" class=header-anchor >Verification: Benchmarking</a></h2>
+<pre><code class="julia hljs"><span class=hljs-keyword >using</span> BenchmarkTools
+
+<span class=hljs-meta >@btime</span> factorial($(<span class=hljs-built_in >Val</span>(<span class=hljs-number >13</span>)))
+<span class=hljs-meta >@btime</span> factorial($(<span class=hljs-number >13</span>))</code></pre>
+<pre><code class="plaintext hljs">ArgumentError: Package BenchmarkTools not found in current path.
+- Run `import Pkg; Pkg.add(&quot;BenchmarkTools&quot;)` to install the BenchmarkTools package.
+</code></pre>
+<p>NB: <code>factorial</code> from Julia base uses a lookup table and is quite fast. A naive, non-tail recursive implementation would be much slower than both of these.</p>
+<pre><code class="julia hljs"><span class=hljs-keyword >function</span> factorial_naive(n)
+	n == <span class=hljs-number >0</span> &amp;&amp; <span class=hljs-keyword >return</span> <span class=hljs-number >1</span>
+	<span class=hljs-keyword >return</span> n * factorial_naive(n-<span class=hljs-number >1</span>)
+<span class=hljs-keyword >end</span>
+
+<span class=hljs-meta >@btime</span> factorial_naive($(<span class=hljs-number >13</span>))</code></pre>
+<pre><code class="plaintext hljs">LoadError: UndefVarError: `@btime` not defined
+in expression starting at none:2
+</code></pre>
+<h2 id=bounds_checking ><a href="#bounds_checking" class=header-anchor >Bounds Checking</a></h2>
+<p>There is still a problem with this – it does not check for negative values unlike the default factorial in Julia base. We can work around that  as well.</p>
+<pre><code class="julia hljs"><span class=hljs-keyword >function</span> factorial(::<span class=hljs-built_in >Val</span>{N}) <span class=hljs-keyword >where</span> N
+	N &lt; <span class=hljs-number >0</span> &amp;&amp; throw(<span class=hljs-built_in >DomainError</span>(N, <span class=hljs-string >&quot;`factorial` expects non-zero integers.&quot;</span>))
+	N * factorial(<span class=hljs-built_in >Val</span>(N-<span class=hljs-number >1</span>))
+<span class=hljs-keyword >end</span>
+
+<span class=hljs-meta >@show</span> <span class=hljs-meta >@test_throws</span> <span class=hljs-built_in >DomainError</span> factorial(<span class=hljs-built_in >Val</span>(-<span class=hljs-number >1</span>))</code></pre>
+<pre><code class="plaintext hljs">#= none:2 =# @test_throws(DomainError, factorial(Val(-1))) = Test Passed
+      Thrown: DomainError
+</code></pre>
+<p>Is it still comptime?</p>
+<pre><code class="julia hljs">println(<span class=hljs-string >&quot;&gt;&gt;&gt; TYPED CODE &lt;&lt;&lt;&quot;</span>)
+<span class=hljs-meta >@show</span> <span class=hljs-meta >@code_typed</span> factorial(<span class=hljs-built_in >Val</span>(<span class=hljs-number >13</span>))
+println()
+println(<span class=hljs-string >&quot;&gt;&gt;&gt; BENCHMARK &lt;&lt;&lt;&quot;</span>)
+<span class=hljs-meta >@btime</span> factorial($(<span class=hljs-built_in >Val</span>(<span class=hljs-number >13</span>)))</code></pre>
+<pre><code class="plaintext hljs">&gt;&gt;&gt; TYPED CODE &lt;&lt;&lt;
+#= none:1 =# @code_typed(factorial(Val(13))) = CodeInfo(
+1 ─     nothing::Nothing
+└──     return 6227020800
+) =&gt; Int64
+
+&gt;&gt;&gt; BENCHMARK &lt;&lt;&lt;
+LoadError: UndefVarError: `@btime` not defined
+in expression starting at none:1
+</code></pre>
+<p>Looks like it is.</p>
+<h2 id=what_is_the_use_of_all_this ><a href="#what_is_the_use_of_all_this" class=header-anchor >What is the use of all this?</a></h2>
+<p>We are effectively creating a compile-time lookup table in the julia runtime. This particular example would be very useful if you are working with something like Taylor series of many different functions, and you are calling them repeatedly. By using this, every call to <code>factorial</code> using <code>Val</code>s would reduce to a single register allocation &#40;assuming first compilation is done of course&#41;.</p>
+<p>As a next step, one could create a macro that would take code like <code>factorial&#40;13&#41;</code> and convert it to <code>factorial&#40;Val&#40;13&#41;&#41;</code> for ergonomics; think the <code>@view</code> macro that converts array slices &#40;which would incur overhead of allocation and copying&#41; into views. And since we have an analogy with <code>@view</code>, the next step would be a macro like <code>@views</code> that would recurse into an expression and replace all constants with their <code>Val</code> variants, and a macro that can generate <code>Val</code> variants of structs and functions, similar to <code>@adapt_structure</code> from <a href="https://github.com/JuliaGPU/Adapt.jl">Adapt.jl</a></p>
+<div class=page-foot >
+    <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> Chaitanya Kumar. Last modified: June 02, 2023.
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia programming language</a>.
+</div>
+</div>
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>hljs.highlightAll();hljs.configure({tabReplace: '    '});</script>

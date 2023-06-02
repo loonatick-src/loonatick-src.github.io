@@ -1,0 +1,3 @@
+#= none:2 =# @code_typed(factorial(Val(10))) = CodeInfo(
+1 ─     return 3628800
+) => Int64
