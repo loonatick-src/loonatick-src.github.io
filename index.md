@@ -12,9 +12,5 @@ nature. Nevertheless, this blog is not intended to be too niche, hence
 the name "Compute General".
 
 # Posts
-~~~
-<ul>
-	<li><a href="/pages/intro/">Introduction and Compile-Time Programming in Julia</a></li>
-	<li><a href="/pages/rtweekend1/">Optimizing a Ray Tracer in One Weekend: Part 1</a></li>
-</ul>
-~~~
+* [Compile-Time Programming in Julia][/pages/intro/]
+* [Optimizing a Ray Tracer in One Weekend: Part 1][/pages/rtweekend1/]
