@@ -1,9 +1,9 @@
 	.text
 	.file	"factorial"
-	.globl	julia_factorial_1288            # -- Begin function julia_factorial_1288
+	.globl	julia_factorial_1153            # -- Begin function julia_factorial_1153
 	.p2align	4, 0x90
-	.type	julia_factorial_1288,@function
-julia_factorial_1288:                   # @julia_factorial_1288
+	.type	julia_factorial_1153,@function
+julia_factorial_1153:                   # @julia_factorial_1153
 ; ┌ @ none:1 within `factorial`
 	.cfi_startproc
 # %bb.0:                                # %top
@@ -17,7 +17,7 @@ julia_factorial_1288:                   # @julia_factorial_1288
 	.cfi_def_cfa %rsp, 8
 	retq
 .Lfunc_end0:
-	.size	julia_factorial_1288, .Lfunc_end0-julia_factorial_1288
+	.size	julia_factorial_1153, .Lfunc_end0-julia_factorial_1153
 	.cfi_endproc
 ; └
                                         # -- End function
