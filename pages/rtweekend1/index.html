@@ -1,1 +1,99 @@
-<!doctype html> <html lang=en > <meta charset=UTF-8 > <meta name=viewport  content="width=device-width, initial-scale=1"> <link rel=stylesheet  href="/libs/highlight/styles/github.min.css"> <link rel=stylesheet  href="/css/franklin.css"> <link rel=stylesheet  href="/css/compute_general.css"> <link rel=icon  href="/assets/favicon.png"> <title>Optimizing a Ray Tracer in One Weekend: Part 1</title> <header> <div class=blog-name ><a href="/">Compute General</a></div> <nav> <ul> <li><a href="/">Home</a> </ul> <img src="/assets/hamburger.svg" id=menu-icon > </nav> </header> <div class=franklin-content > <h1 id=introduction ><a href="#introduction" class=header-anchor >Introduction</a></h1> <h1 id=what_this_is_not ><a href="#what_this_is_not" class=header-anchor >What this is not</a></h1> <p>This post is absolutely NOT intended to be a critique of Dr. Peter Shirley&#39;s work. The &quot;Ray Tracing in One Weekend&quot; series is a very approachable and excellent resource for learning concepts in ray tracing, and we are merely demonstrating some basic, general performance optimization principles not specific to computer graphics or ray-tracing. To quote from the original project&#39;s <code>README</code>:</p> <blockquote> <p>It is not meant to represent ideal &#40;or optimized&#41; C&#43;&#43; code.</p> </blockquote> <p>Assume that the same holds for the modifications that we set out to do. Consequently, this series is also NOT an opinion on how to make &quot;production-ready&quot; ray tracers. As mentioned, we simply hunt down performance bottlenecks &#40;or hotspots&#41; and get rid of them incrementally. There is no way of getting anywhere close to the hardware&#39;s peak performance using the hotspot-optimization approach in most baseline implementations. A performant ray tracer would have a completely different architecture and would thus require a complete rewrite <sup id="fnref:1"><a href="#fndef:1" class=fnref >[1]</a></sup></p> <table class=fndef  id="fndef:1"> <tr> <td class=fndef-backref ><a href="#fnref:1">[1]</a> <td class=fndef-content >Daniel Lemire covers this general principle in more detail in <a href="https://lemire.me/blog/2023/04/27/hotspot-performance-engineering-fails/">his blog</a>. Therein he referes to Casey Muratori&#39;s <a href="https://www.computerenhance.com/p/performance-excuses-debunked">article on performance excuses</a>. Read that as well if you have not yet. </table> <p></p> <div class=page-foot > <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> Chaitanya Kumar. Last modified: June 02, 2023. Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia programming language</a>. </div> </div> <script src="/libs/highlight/highlight.min.js"></script> <script>hljs.highlightAll();hljs.configure({tabReplace: ' '});</script>
+<!doctype html> <html lang=en > <meta charset=UTF-8 > <meta name=viewport  content="width=device-width, initial-scale=1"> <link rel=stylesheet  href="/libs/highlight/styles/github.min.css"> <link rel=stylesheet  href="/css/franklin.css"> <link rel=stylesheet  href="/css/compute_general.css"> <link rel=icon  href="/assets/favicon.png"> <title>[WIP] Optimizing a Ray Tracer in One Weekend: Part 1</title> <header> <div class=blog-name ><a href="/">Compute General</a></div> <nav> <ul> <li><a href="/">Home</a> </ul> <img src="/assets/hamburger.svg" id=menu-icon > </nav> </header> <div class=franklin-content > <h1 id=introduction ><a href="#introduction" class=header-anchor >Introduction</a></h1> <p>This series of posts describes the work that we did for a course project in performance engineering, and can serve as an entry-level introduction to performance optimization of programs. We start with some code that has already been written for us, in this case Dr Peter Shirley&#39;s <a href=raytracing.github.io >Ray Tracing in One Weekend</a> series. Some familiarity with this work is assumed. But, as such you do not need to know specific concepts of ray tracing to follow along.</p> <p>We are going to start with some small, simple optimizations and move on to more sophisticated techniques, run into increasingly bizarre problems, and get somewhat intimate with our hardware.</p> <h1 id=what_this_is_not ><a href="#what_this_is_not" class=header-anchor >What this is not</a></h1> <p>This post is absolutely NOT intended to be a critique of Dr. Peter Shirley&#39;s work. The &quot;Ray Tracing in One Weekend&quot; series is a very approachable and excellent resource for learning concepts in ray tracing and physically based rendering &#40;PBR&#41;, and we are merely demonstrating some basic, general performance optimization principles not specific to computer graphics or ray-tracing. To quote from the original project&#39;s <code>README</code>:</p> <blockquote> <p>It is not meant to represent ideal &#40;or optimized&#41; C&#43;&#43; code.</p> </blockquote> <p>Assume that something similar holds for the modifications that we set out to do, the code will be &quot;optimized&quot; to some extent, but not ideal. Consequently, this series is also NOT an opinion on how to make &quot;production-ready&quot; ray tracers. As mentioned, we simply hunt down performance bottlenecks &#40;or hotspots&#41; and get rid of them incrementally. There is no way of getting anywhere close to the hardware&#39;s peak performance using the hotspot-optimization approach in <em>most</em> baseline implementations of complex applications. A performant ray tracer would have a completely different architecture and would thus require a complete rewrite <sup id="fnref:1"><a href="#fndef:1" class=fnref >[1]</a></sup>.</p> <h1 id=where_to_begin_a_birds_eye_view ><a href="#where_to_begin_a_birds_eye_view" class=header-anchor >Where to begin? A bird&#39;s eye view</a></h1> <p>The scene that we optimize for is <code>src/TheRestOfYourLife/main.cc</code>. That&#39;s a lot of source files. Before diving into benchmarking, profiling and all that, let us just take a look at the main program.</p> <pre><code class="Cpp hljs"><span class=hljs-comment >/* ...
+ * includes and functions definitions omitted
+ * ...
+ */</span>
+
+<span class=hljs-function ><span class=hljs-type >int</span> <span class=hljs-title >main</span><span class=hljs-params >()</span> </span>{
+    <span class=hljs-comment >// Image</span>
+	<span class=hljs-comment >/*** code for configuring image properties ***/</span>
+
+    <span class=hljs-comment >// World</span>
+
+	<span class=hljs-comment >/*** Code for setting up Cornell box ***/</span>
+
+    <span class=hljs-comment >// Camera</span>
+
+	<span class=hljs-comment >/*nn** Code for configuring camera ***/</span>
+	
+    <span class=hljs-comment >// Render</span>
+
+    std::cout &lt;&lt; <span class=hljs-string >&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class=hljs-string >&#x27; &#x27;</span> &lt;&lt; image_height &lt;&lt; <span class=hljs-string >&quot;\n255\n&quot;</span>;
+
+	<span class=hljs-comment >// iterate over every pixel in row-major/width-major order</span>
+    <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> j = image_height<span class=hljs-number >-1</span>; j &gt;= <span class=hljs-number >0</span>; --j) {
+        std::cerr &lt;&lt; <span class=hljs-string >&quot;\rScanlines remaining: &quot;</span> &lt;&lt; j &lt;&lt; <span class=hljs-string >&#x27; &#x27;</span> &lt;&lt; std::flush;
+        <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> i = <span class=hljs-number >0</span>; i &lt; image_width; ++i) {
+            <span class=hljs-function >color <span class=hljs-title >pixel_color</span><span class=hljs-params >(<span class=hljs-number >0</span>,<span class=hljs-number >0</span>,<span class=hljs-number >0</span>)</span></span>;
+            <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> s = <span class=hljs-number >0</span>; s &lt; samples_per_pixel; ++s) {
+                <span class=hljs-keyword >auto</span> u = (i + <span class=hljs-built_in >random_double</span>()) / (image_width<span class=hljs-number >-1</span>);
+                <span class=hljs-keyword >auto</span> v = (j + <span class=hljs-built_in >random_double</span>()) / (image_height<span class=hljs-number >-1</span>);
+                ray r = cam.<span class=hljs-built_in >get_ray</span>(u, v);
+                pixel_color += <span class=hljs-built_in >ray_color</span>(r, background, world, lights, max_depth);
+            }
+            <span class=hljs-built_in >write_color</span>(std::cout, pixel_color, samples_per_pixel);
+        }
+    }
+    std::cerr &lt;&lt; <span class=hljs-string >&quot;\nDone.\n&quot;</span>;
+}</code></pre> <p>Everything before the loop over the pixels is setting up the scene, camera etc. We will not be benchmarking those things. The actual work is done inside the loop. The final image resolution is fixed during the image setup, and rendering involves iterating over each pixel coordinate and calculating its colour using the subroutine/function <code>ray_color</code>.</p> <p>Do you see low-hanging fruit? I see low-hanging fruit. All pixels colours are computed independently; we have an embarrassingly parallel problem in our hands. We paid for all cores in the processor, we will use all the cores in our processor; parallelize the loop. The easiest way &#40;read: minimal short-term effort&#41; is using <a href="https://www.openmp.org/wp-content/uploads/openmp-examples-4.5.0.pdf">OpenMP</a> <sup id="fnref:4"><a href="#fndef:4" class=fnref >[2]</a></sup>.</p> <p>Parallelizing the loop is as simple as adding a one-line directive before the loop.</p> <pre><code class="Cpp hljs"><span class=hljs-meta >#<span class=hljs-keyword >pragma</span> omp parallel for  <span class=hljs-comment >// &lt;------------- new compiler directive</span></span>
+    <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> j = image_height<span class=hljs-number >-1</span>; j &gt;= <span class=hljs-number >0</span>; --j) {
+		<span class=hljs-comment >/*** rest of the rendering ***/</span>
+	}</code></pre> <p>There is just one more hurdle: <code>write_color</code> writes to <code>stdout</code>. Introducing multi-threading in the mix will interleave the outputs from all threads and produce a completely corrupted image. So, we stage the writes to a buffer in the loop, and write the contents to a file afterwards <sup id="fnref:2"><a href="#fndef:2" class=fnref >[3]</a></sup>. So, we end up with the following.</p> <pre><code class="Cpp hljs"><span class=hljs-comment >/*** create an image buffer ***/</span>
+<span class=hljs-function >std::vector&lt;color&gt; <span class=hljs-title >image_buffer</span><span class=hljs-params >(image_width * image_height)</span></span>;
+	  
+<span class=hljs-meta >#<span class=hljs-keyword >pragma</span> omp parallel for</span>
+<span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> j = image_height<span class=hljs-number >-1</span>; j &gt;= <span class=hljs-number >0</span>; --j) {
+    <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> i = <span class=hljs-number >0</span>; i &lt; image_width; ++i) {
+        <span class=hljs-function >color <span class=hljs-title >pixel_color</span><span class=hljs-params >(<span class=hljs-number >0</span>,<span class=hljs-number >0</span>,<span class=hljs-number >0</span>)</span></span>;
+        <span class=hljs-keyword >for</span> (<span class=hljs-type >int</span> s = <span class=hljs-number >0</span>; s &lt; samples_per_pixel; ++s) {
+            <span class=hljs-keyword >auto</span> u = (i + <span class=hljs-built_in >random_double</span>()) / (image_width<span class=hljs-number >-1</span>);
+            <span class=hljs-keyword >auto</span> v = (j + <span class=hljs-built_in >random_double</span>()) / (image_height<span class=hljs-number >-1</span>);
+            ray r = cam.<span class=hljs-built_in >get_ray</span>(u, v);
+            pixel_color += <span class=hljs-built_in >ray_color</span>(r, background, world, lights, max_depth);
+        }
+        <span class=hljs-comment >/*** Stage writes to image buffer ***/</span>
+        image_buffer[(image_height<span class=hljs-number >-1</span>-j) * image_height + i] = pixel_color;
+    }
+}
+<span class=hljs-comment >// Write image to file</span>
+<span class=hljs-keyword >for</span> (<span class=hljs-keyword >auto</span> c: image_buffer) {
+    <span class=hljs-built_in >write_color</span>(std::cout, c, samples_per_pixel);
+}</code></pre> <p>Of course, we also need a way to set the number of threads. One way would be compilng with different values of the environment variable <code>OMP_NUM_THREADS</code>. We want to run the program for different problem sizes and different thread counts to analyze its scaling properties. So, we accept the command line flags <code>-t</code> for thread count and <code>-w</code> for image width. The height is determined by the aspect ratio in the image setup.</p> <pre><code class="Cpp hljs"><span class=hljs-function ><span class=hljs-type >int</span> <span class=hljs-title >main</span><span class=hljs-params >(<span class=hljs-type >int</span> argc, <span class=hljs-type >char</span> *argv[])</span> </span>{
+    <span class=hljs-comment >// default parameters</span>
+    <span class=hljs-type >int</span> image_width = <span class=hljs-number >600</span>, thread_count = <span class=hljs-number >1</span>;
+
+    <span class=hljs-comment >/*** Parse command line arguments ***/</span>
+    <span class=hljs-type >int</span> opt = <span class=hljs-number >-1</span>;
+    <span class=hljs-keyword >while</span> ((opt = <span class=hljs-built_in >getopt</span>(argc, argv, <span class=hljs-string >&quot;w:t:&quot;</span>)) != <span class=hljs-number >-1</span>) {
+        <span class=hljs-keyword >switch</span> (opt) {
+            <span class=hljs-keyword >case</span> <span class=hljs-string >&#x27;w&#x27;</span>:
+                <span class=hljs-keyword >if</span> (optarg == <span class=hljs-literal >nullptr</span>) <span class=hljs-keyword >break</span>;
+                image_width = std::<span class=hljs-built_in >atoi</span>(optarg);
+                <span class=hljs-keyword >if</span> (image_width &lt;= <span class=hljs-number >0</span>) {
+                    std::cerr &lt;&lt; <span class=hljs-string >&quot;Error: image width must be a positive integer, found &quot;</span> &lt;&lt; optarg;
+                    <span class=hljs-keyword >return</span> <span class=hljs-number >1</span>;
+                }
+                <span class=hljs-keyword >break</span>;
+            <span class=hljs-keyword >case</span> <span class=hljs-string >&#x27;t&#x27;</span>:
+                <span class=hljs-keyword >if</span> (optarg == <span class=hljs-literal >nullptr</span>) <span class=hljs-keyword >break</span>;
+	            thread_count = std::<span class=hljs-built_in >atoi</span>(optarg);
+	            <span class=hljs-keyword >if</span> (thread_count &lt;= <span class=hljs-number >0</span>) {
+		            std::cerr &lt;&lt; <span class=hljs-string >&quot;Error: thread count must be a positive integer, found &quot;</span> &lt;&lt; optarg;
+                    <span class=hljs-keyword >return</span> <span class=hljs-number >1</span>;
+                }
+                <span class=hljs-keyword >break</span>;
+            <span class=hljs-keyword >default</span>:
+                std::cerr &lt;&lt; <span class=hljs-string >&quot;Error: Invalid flag&quot;</span> &lt;&lt; std::endl;
+	            <span class=hljs-keyword >return</span> <span class=hljs-number >1</span>;
+        }
+    }
+
+    <span class=hljs-built_in >omp_set_num_threads</span>(thread_count);
+    <span class=hljs-comment >// Image</span>
+    <span class=hljs-comment >/*** rest of `main` ***/</span>
+}</code></pre> <p>Before we get down to using precise timers in <code>std::chrono</code>, let&#39;s just get a rough look at that sweet speedup using the <code>time</code> program on Linux.</p> <pre><code class="julia hljs">$ <span class=hljs-comment ># single threaded run</span>
+$ time build/TheRestOfYourLife &gt; image.pgm
+./build/theRestOfYourLife  <span class=hljs-number >76.22</span>s user <span class=hljs-number >0.51</span>s system <span class=hljs-number >99</span>% cpu <span class=hljs-number >1</span>:<span class=hljs-number >16.74</span> total
+
+$ <span class=hljs-comment ># using 6 threads</span>
+$ time build/TheRestOfYourLife -t <span class=hljs-number >6</span> &gt; image.pgm
+./build/theRestOfYourLife -t <span class=hljs-number >6</span> &gt; image.pgm  <span class=hljs-number >353.12</span>s user <span class=hljs-number >274.76</span>s system <span class=hljs-number >546</span>% cpu <span class=hljs-number >1</span>:<span class=hljs-number >54.84</span> total</code></pre> <p>Dude what</p> <p>Using six threads resulted in a severe slowdown instead. What went horribly wrong?</p> <p><em>TODO: plot weak and strong scaling results.</em></p> <p><table class=fndef  id="fndef:1"> <tr> <td class=fndef-backref ><a href="#fnref:1">[1]</a> <td class=fndef-content >Daniel Lemire covers this general principle in more detail in <a href="https://lemire.me/blog/2023/04/27/hotspot-performance-engineering-fails/">his blog</a>. Therein he referes to Casey Muratori&#39;s <a href="https://www.computerenhance.com/p/performance-excuses-debunked">article on performance excuses</a>. Read that as well if you haven&#39;t yet. </table> <table class=fndef  id="fndef:2"> <tr> <td class=fndef-backref ><a href="#fnref:2">[3]</a> <td class=fndef-content >Alternatively, use an mmapped file. </table> </p> <p></p> <div class=page-foot > <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> Chaitanya Kumar. Last modified: June 02, 2023. Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia programming language</a>. </div> </div> <script src="/libs/highlight/highlight.min.js"></script> <script>hljs.highlightAll();hljs.configure({tabReplace: ' '});</script>
