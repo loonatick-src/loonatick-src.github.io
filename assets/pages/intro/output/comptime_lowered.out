@@ -5,5 +5,4 @@
 ) => Int64
 
 >>> BENCHMARK <<<
-LoadError: UndefVarError: `@btime` not defined
-in expression starting at none:1
+  1.500 ns (0 allocations: 0 bytes)

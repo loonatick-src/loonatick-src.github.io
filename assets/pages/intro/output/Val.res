@@ -1,1 +1,1 @@
-Test.DefaultTestSet("Val types", Any[], 2, false, false, true, 1.685742059885224e9, 1.685742059932392e9, false)
+Test.DefaultTestSet("Val types", Any[], 2, false, false, true, 1.68587940492809e9, 1.685879405000401e9, false)
