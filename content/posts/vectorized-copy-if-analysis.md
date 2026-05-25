@@ -806,10 +806,9 @@ from this whole exercise.
 3. If you have determined that your code is CPU-bound, Yasin's top-down analysis
    using `perf stat` is a great starting point for systematically drilling down
    into root cause of the bottleneck.
-4. 
-5. Use IBS on AMD CPUs for high confidence sampling of CPU microbenchmarks to
+4. Use IBS on AMD CPUs for high confidence sampling of CPU microbenchmarks to
    not be thrown off by skid (no pun intended).
-6. Consider using cross-platform SIMD libraries like EVE, highway,
+5. Consider using cross-platform SIMD libraries like EVE, highway,
    xsimd etc for portable performance.
    
 Most likely I will cover EVE in the next SIMD related article.
