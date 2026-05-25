@@ -685,7 +685,7 @@ compressed : | 2 | 4 | 8 | 0 | 0 | 0 | 0 | 0 |
 For copy_if, these will be overwritten by loop iterations writes anyway, but
 care will have to be taken to allocate extra bytes to destination.
 
-Another suggestion by Mysticial mersenneforum [^mersenneforum] is the following:
+Another suggestion by Mysticial mersenneforum [^mersenne-zen4-teardown] is the following:
 
 ```
 vpcompressd zmm0{k1}{z}, zmm0
