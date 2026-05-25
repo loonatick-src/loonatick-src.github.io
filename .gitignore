@@ -1,0 +1,14 @@
+# Hugo
+  public/
+  resources/
+  .hugo_build.lock
+
+  # Editor / OS
+  .DS_Store
+  *.swp
+
+  # Stray artifacts
+  *.png
+  !static/**/*.png
+  The *.png + negation keeps post images under static/ tracked but ignores the stray
+  screenshot at the repo root.
