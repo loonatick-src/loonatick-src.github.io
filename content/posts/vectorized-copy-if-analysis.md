@@ -707,7 +707,7 @@ vmovdqu32   [mem]{k1}, zmm0
 These use a masked store, so additional space should not be required, and the masked store decodes
 down to 2 uops on Zen4 ([uops.info table link](https://uops.info/table.html?search=vmovdqu32%20(M512&cb_lat=on&cb_tp=on&cb_uops=on&cb_ports=on&cb_ZEN4=on&cb_measurements=on&cb_doc=on&cb_base=on&cb_avx512=on))).
 
-Let's try the unconditional store variant.
+Let's try the maskless store variant.
 
 ```c++
 template <template <typename> class Predicate>
