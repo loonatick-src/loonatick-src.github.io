@@ -74,7 +74,7 @@ separately. Perhaps I need to think of a better name too. This deterines how
 predictable the input is, because all pipelined CPUs have branch-prediction
 logic. E.g. if the CPU frontend (FE) finds a conditional jump instruction, it will
 not wait for its operand to be ready and will instead speculatively jump to a
-target address. Misspeceulation reults in a large penalty requiring a complete
+target address. Misspeculation reults in a large penalty requiring a complete
 pipeline flush and restarting execution. The same predicate and distribution
 combination as above can make it difficult for most branch predictors to have a
 high branch-miss-rate, thereby adversely affecting throughput.
