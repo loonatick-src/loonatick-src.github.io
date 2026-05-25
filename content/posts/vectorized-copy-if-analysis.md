@@ -1,6 +1,6 @@
 ---
 date: '2026-05-25T10:03:34+02:00'
-draft: true
+draft: false
 title: 'Accelerating copy_if using SIMD'
 ---
 
