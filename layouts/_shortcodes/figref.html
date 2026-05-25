@@ -1,0 +1,20 @@
+{{- /*
+  Cross-reference to a {{< fig >}} by key. Renders a link "Figure N".
+
+  Usage (inline):  As shown in {{< figref "baseline-bw" >}}, the bandwidth ...
+
+  If the referenced figure has not been rendered yet on this page (forward
+  reference), the number is unknown; we still emit a working anchor link with
+  the text "Figure (below)" so the prose stays readable.
+*/ -}}
+{{- $key := .Get 0 | default (.Get "key") -}}
+{{- if not $key -}}
+  {{- errorf "figref: missing figure key (%s)" .Position -}}
+{{- end -}}
+{{- $map := .Page.Store.Get "figMap" | default dict -}}
+{{- $n := index $map $key -}}
+{{- if $n -}}
+<a href="#fig-{{ $key }}">Figure {{ $n }}</a>
+{{- else -}}
+<a href="#fig-{{ $key }}">Figure (below)</a>
+{{- end -}}

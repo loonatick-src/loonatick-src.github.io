@@ -1,0 +1,40 @@
+{{- /*
+  Numbered figure with a stable anchor for cross-referencing.
+
+  Usage:
+    {{< fig key="baseline-bw" src="/images/copyif/baseline.svg"
+            alt="Baseline bandwidth" caption="likwid-bench copy bandwidth." >}}
+
+  Reference it elsewhere in the same page with: {{< figref "baseline-bw" >}}
+
+  The per-page counter and key->number map live in .Page.Store, so numbers
+  follow source order. Caveat: a {{< figref >}} that appears *before* its
+  {{< fig >}} in the document cannot know the number yet (content renders
+  top-to-bottom) and will fall back to a plain anchor link.
+*/ -}}
+{{- $key := .Get "key" -}}
+{{- if not $key -}}
+  {{- errorf "fig: missing required 'key' parameter (%s)" .Position -}}
+{{- end -}}
+{{- $n := add (.Page.Store.Get "figCounter" | default 0) 1 -}}
+{{- .Page.Store.Set "figCounter" $n -}}
+{{- $map := .Page.Store.Get "figMap" | default dict -}}
+{{- $map = merge $map (dict $key $n) -}}
+{{- .Page.Store.Set "figMap" $map -}}
+<figure id="fig-{{ $key }}"{{ if or (.Get "class") (eq (.Get "align") "center") }} class="
+       {{- if eq (.Get "align") "center" }}align-center {{ end }}
+       {{- with .Get "class" }}{{ . }}{{- end }}"
+{{- end -}}>
+    {{- if .Get "link" -}}
+        <a href="{{ .Get "link" }}"{{ with .Get "target" }} target="{{ . }}"{{ end }}>
+    {{- end }}
+    <img loading="lazy" src="{{ .Get "src" }}{{- if eq (.Get "align") "center" }}#center{{- end }}"
+         {{- if or (.Get "alt") (.Get "caption") }}
+         alt="{{ with .Get "alt" }}{{ . }}{{ else }}{{ .Get "caption" | markdownify | plainify }}{{ end }}"
+         {{- end -}}
+         {{- with .Get "width" }} width="{{ . }}"{{ end -}}
+         {{- with .Get "height" }} height="{{ . }}"{{ end -}}
+    />
+    {{- if .Get "link" }}</a>{{ end -}}
+    <figcaption><strong>Figure {{ $n }}.</strong>{{ with .Get "caption" }} {{ . | markdownify }}{{ end }}</figcaption>
+</figure>

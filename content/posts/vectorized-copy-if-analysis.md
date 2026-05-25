@@ -1,7 +1,7 @@
 ---
-date: '2026-05-15T10:03:34+02:00'
+date: '2026-05-25T10:03:34+02:00'
 draft: true
-title: 'Thinking in SIMD: `copy_if`'
+title: 'Accelerating copy_if using SIMD'
 ---
 
 ## Introduction
@@ -18,8 +18,7 @@ wheel-reinvention. I started with the following goals.
 3. Start simple, make it work.
 
 Which means that dead simple algorithms like map/transform, reduce,
-adjacent_difference etc are out, as they are very autovectorizable. (TODO:
-compiler explorer link). Even 2D stencils are out because [look at this](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjE/lykAA6oCoRODB7evv5JKWkCIWGRLDFxZgl2mA7pQgRMxASZPn4BldUCtfUEhRHRsfG2dQ1N2a1D3aG9Jf3lAJS2qF7EyOwc5gDMocjeWADUJutuAG5VRMQH2CYaAIIbWzuY%2B4fICgToWFQXV7c3APS/uzMABFdgBWAC0yVCBF2r0YyDouwA1rEwrRdhAgkxEgYEYZdgCEJgmDDMABHLwk9KwggAT3os2%2B/12iwIJlBFjw7KB7Is2m5TxBoV5XNBPI52nBXAF1l2wo5ovFfOs0rF%2B0scoYIql3N5/LVsvlnJVuolAvBu0kACojYq9bqbkdUHh0DT4XRQRA0AxXrsqLRUCSrbsAPoh4iYV7EPAOMOa0jfXZJ5Mp1Op/2BgjBsMRqMxghx1kJm5p0ul17oEAgVIAL0wIZh4WL1zLreTFartfrMIAsoybiYAOxWEvJ/jEDEd6t4OsNuWC3bS9YWecHNy7cK7C1LlfWax4Wb7YeJ0vjydvTsz7u7bQLnc3p7rntbxcHXeWazaQ9Dkcttssrw2QVXZg2fWV9RBA4eVHf9kyNCA8BfLhD1A9UVwg5NmQYEgCAQE9YMNLUOQQtDFxQ3YwI1DCk2ZBRWTwmD/0IkUQIo0iIFvbdGTVGiAQAd0jNlGLbZjgNQ2UONI5CBV43ZiVefD/wtSQADoNCoVjbVYyj0N1ZcCQBFZBFiRSUyHaC/yTczvnMjh5loThQV4PwOC0UhUE4Nw9w1OilhWdV1h4UgCE0Oz5iREB1lUgBOLgzAADlBSQNHWDRQQ0LgNGi/ROEkZzQvczheAUEANGC0L5jgWAkDQFhEjoWJyEoWr6voOJtkMYAzHKMqaFoAhYhKiAogKqJQnqWlOCCsbmGIWkAHkom0U4pt4Wq2EEeaGFoSbXN4LAoi8YA3DEWgSu4fbMBYTrxD20h8AjaoTnOtzMFUKpANWILoUwBy7toPAomICaPCwAqCGjFhVtIE5iCiFJMCBK6btCUA9vmf0mGABQADU8EwPj5sSRhof4QQRDEdgpBkQRFBUdQ7t0dZ9E6lBvJsAGohKyB5lQRJHAEc7wQrKDTA/SwzHWLdruWPD1iBGsGFhyQt3m9ZeFQWHoywbmIHmNoBb8CBXBGPwEmCSZilKPRklSQ3TZtvJDZ6K3%2BgqX7ThqcYHfd%2BxDc6BoXb6OIKm9zxmj0V4uiD6YQ/1xZlip%2BzHPyu6PI4XZVHigA2cFs5VjqjEBMwVK4NSMVwQgSAC5DeBC9HSAgGqqGAJqvUYAbiESeoO/OoKWoa4hwlYVYs9z/PdkL4Bi9LtTeEwfAzhdPQmdIWbiFQPiIcwX6mFpVloYNheADEvAYdoXLhc%2BPWoAMSUnwWs1IP076f3Yz9SYAwldAMjGfj%2B8BfwXrsX%2BwBZicGChGTAy8NDJw4E5NeBV05uGPgAcUzjnPOBcDBF26rPDQFdF7Vw2AkXYHg6qDwCusWYdcKrzCJEwLAcQ9akAitnUEal4qDikKCaK2doqSGivFaKAQ/p5UQWnIqtg9D1y0LMOBZhU5uXTrQ9G8xYapGcJIIAA%3D%3D%3D "2D five-point stencil on Compiler Explorer"). So, I
+adjacent_difference etc are out, as [they are very autovectorizable](https://godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(filename:'1',fontScale:14,fontUsePx:'0',j:1,lang:c%2B%2B,selection:(endColumn:2,endLineNumber:11,positionColumn:2,positionLineNumber:11,selectionStartColumn:2,selectionStartLineNumber:11,startColumn:2,startLineNumber:11),source:'%23include+%3Calgorithm%3E%0A%23include+%3Cnumeric%3E%0A%23include+%3Cvector%3E%0A%0Aint+reduce(std::vector%3Cint%3E+const%26+input)+%7B%0A++++return+std::reduce(input.begin(),+input.end(),+0)%3B%0A%7D%0A%0Avoid+adjacent_difference(std::vector%3Cint%3E+const%26+input,+std::vector%3Cint%3E%26+output)+%7B%0A++++std::adjacent_difference(input.cbegin(),+input.cend(),+output.begin())%3B%0A%7D'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:43.29460179133382,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang2210,filters:(b:'0',binary:'1',binaryObject:'1',commentOnly:'0',debugCalls:'1',demangle:'0',directives:'0',execute:'1',intel:'0',libraryCode:'0',trim:'1',verboseDemangling:'0'),flagsViewOpen:'1',fontScale:14,fontUsePx:'0',j:3,lang:c%2B%2B,libs:!(),options:'-std%3Dc%2B%2B23+-march%3Dznver4+-O3+-Wall+-Wextra',overrides:!(),selection:(endColumn:1,endLineNumber:1,positionColumn:1,positionLineNumber:1,selectionStartColumn:1,selectionStartLineNumber:1,startColumn:1,startLineNumber:1),source:1),l:'5',n:'0',o:'+x86-64+clang+22.1.0+(Editor+%231)',t:'0'),(h:cfg,i:(centerparents:'1',compilerName:'x86-64+clang+22.1.0',editorid:1,j:3,narrowtreelayout:'0',selectedFunction:'foo(std::vector%3Cint,+std::allocator%3Cint%3E%3E+const%26,+std::vector%3Cint,+std::allocator%3Cint%3E%3E%26):',treeid:0),l:'5',n:'0',o:'CFG+x86-64+clang+22.1.0+(Editor+%231,+Compiler+%233)',t:'0'),(h:output,i:(compilerName:'x86-64+clang+22.1.0',editorid:1,fontScale:14,fontUsePx:'0',j:3,wrap:'1'),l:'5',n:'0',o:'Output+of+x86-64+clang+22.1.0+(Compiler+%233)',t:'0')),header:(),k:56.70539820866619,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4). Even 2D stencils are out because [look at this](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjE/lykAA6oCoRODB7evv5JKWkCIWGRLDFxZgl2mA7pQgRMxASZPn4BldUCtfUEhRHRsfG2dQ1N2a1D3aG9Jf3lAJS2qF7EyOwc5gDMocjeWADUJutuAG5VRMQH2CYaAIIbWzuY%2B4fICgToWFQXV7c3APS/uzMABFdgBWAC0yVCBF2r0YyDouwA1rEwrRdhAgkxEgYEYZdgCEJgmDDMABHLwk9KwggAT3os2%2B/12iwIJlBFjw7KB7Is2m5TxBoV5XNBPI52nBXAF1l2wo5ovFfOs0rF%2B0scoYIql3N5/LVsvlnJVuolAvBu0kACojYq9bqbkdUHh0DT4XRQRA0AxXrsqLRUCSrbsAPoh4iYV7EPAOMOa0jfXZJ5Mp1Op/2BgjBsMRqMxghx1kJm5p0ul17oEAgVIAL0wIZh4WL1zLreTFartfrMIAsoybiYAOxWEvJ/jEDEd6t4OsNuWC3bS9YWecHNy7cK7C1LlfWax4Wb7YeJ0vjydvTsz7u7bQLnc3p7rntbxcHXeWazaQ9Dkcttssrw2QVXZg2fWV9RBA4eVHf9kyNCA8BfLhD1A9UVwg5NmQYEgCAQE9YMNLUOQQtDFxQ3YwI1DCk2ZBRWTwmD/0IkUQIo0iIFvbdGTVGiAQAd0jNlGLbZjgNQ2UONI5CBV43ZiVefD/wtSQADoNCoVjbVYyj0N1ZcCQBFZBFiRSUyHaC/yTczvnMjh5loThQV4PwOC0UhUE4Nw9w1OilhWdV1h4UgCE0Oz5iREB1lUgBOLgzAADlBSQNHWDRQQ0LgNGi/ROEkZzQvczheAUEANGC0L5jgWAkDQFhEjoWJyEoWr6voOJtkMYAzHKMqaFoAhYhKiAogKqJQnqWlOCCsbmGIWkAHkom0U4pt4Wq2EEeaGFoSbXN4LAoi8YA3DEWgSu4fbMBYTrxD20h8AjaoTnOtzMFUKpANWILoUwBy7toPAomICaPCwAqCGjFhVtIE5iCiFJMCBK6btCUA9vmf0mGABQADU8EwPj5sSRhof4QQRDEdgpBkQRFBUdQ7t0dZ9E6lBvJsAGohKyB5lQRJHAEc7wQrKDTA/SwzHWLdruWPD1iBGsGFhyQt3m9ZeFQWHoywbmIHmNoBb8CBXBGPwEmCSZilKPRklSQ3TZtvJDZ6K3%2BgqX7ThqcYHfd%2BxDc6BoXb6OIKm9zxmj0V4uiD6YQ/1xZlip%2BzHPyu6PI4XZVHigA2cFs5VjqjEBMwVK4NSMVwQgSAC5DeBC9HSAgGqqGAJqvUYAbiESeoO/OoKWoa4hwlYVYs9z/PdkL4Bi9LtTeEwfAzhdPQmdIWbiFQPiIcwX6mFpVloYNheADEvAYdoXLhc%2BPWoAMSUnwWs1IP076f3Yz9SYAwldAMjGfj%2B8BfwXrsX%2BwBZicGChGTAy8NDJw4E5NeBV05uGPgAcUzjnPOBcDBF26rPDQFdF7Vw2AkXYHg6qDwCusWYdcKrzCJEwLAcQ9akAitnUEal4qDikKCaK2doqSGivFaKAQ/p5UQWnIqtg9D1y0LMOBZhU5uXTrQ9G8xYapGcJIIAA%3D%3D%3D "2D five-point stencil on Compiler Explorer"). So, I
 settled on `std::copy_if`.
 
 Implementing a SIMD implementation is the easy part. Figuring its perforamnce
@@ -32,8 +31,6 @@ that I will need.
 4. [perf-stat](https://www.brendangregg.com/perf.html#OneLiners#CountingEvents:~:text=Counting%20Events "perf-stat one liners") for drill-down performance analysis by counting events
 
 
-
-## BnB: Baseline 'n Benchmark
 From [cppreference](https://en.cppreference.com/cpp/algorithm/copy),
 `std::copy_if` is a dead-simple algorithm.
 
@@ -53,7 +50,7 @@ OutputIt copy_if(InputIt first, InputIt last,
 }
 ```
 
-The codegen is also very clean (TODO: compiler explorer link and CFG image). It
+The codegen is also very clean ([compiler explorer link](https://godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(filename:'1',fontScale:14,fontUsePx:'0',j:1,lang:c%2B%2B,selection:(endColumn:61,endLineNumber:5,positionColumn:61,positionLineNumber:5,selectionStartColumn:61,selectionStartLineNumber:5,startColumn:61,startLineNumber:5),source:'%23include+%3Calgorithm%3E%0A%23include+%3Cvector%3E%0A%0Avoid+foo(std::vector%3Cint%3E+const%26+input,+std::vector%3Cint%3E%26+output)+%7B%0A++++std::copy_if(input.cbegin(),+input.cend(),+output.begin(),+%5B%5D(auto+const%26+n)+%7B+return+n+%3E+0%3B+%7D)%3B%0A%7D'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:43.29460179133382,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang2210,filters:(b:'0',binary:'1',binaryObject:'1',commentOnly:'0',debugCalls:'1',demangle:'0',directives:'0',execute:'1',intel:'0',libraryCode:'0',trim:'1',verboseDemangling:'0'),flagsViewOpen:'1',fontScale:14,fontUsePx:'0',j:3,lang:c%2B%2B,libs:!(),options:'-std%3Dc%2B%2B23+-march%3Dznver4+-O3+-Wall+-Wextra',overrides:!(),selection:(endColumn:1,endLineNumber:1,positionColumn:1,positionLineNumber:1,selectionStartColumn:1,selectionStartLineNumber:1,startColumn:1,startLineNumber:1),source:1),l:'5',n:'0',o:'+x86-64+clang+22.1.0+(Editor+%231)',t:'0'),(h:cfg,i:(centerparents:'1',compilerName:'x86-64+clang+22.1.0',editorid:1,j:3,narrowtreelayout:'0',selectedFunction:'foo(std::vector%3Cint,+std::allocator%3Cint%3E%3E+const%26,+std::vector%3Cint,+std::allocator%3Cint%3E%3E%26):',treeid:0),l:'5',n:'0',o:'CFG+x86-64+clang+22.1.0+(Editor+%231,+Compiler+%233)',t:'0'),(h:output,i:(compilerName:'x86-64+clang+22.1.0',editorid:1,fontScale:14,fontUsePx:'0',j:3,wrap:'1'),l:'5',n:'0',o:'Output+of+x86-64+clang+22.1.0+(Compiler+%233)',t:'0')),header:(),k:56.70539820866619,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4)). It
 is however non-trivial to vectorize because of a loop-carried dependency: the
 value of `d_first` in iteration `i+1` depends on the value of `pred(*first)` in
 iteration `i`. Let us measure our baseline before we go about vectorizing.
@@ -87,45 +84,28 @@ In the interest of brevity, we fix the predicate (`x > 0`) and distribution
 analysis methods that we shall use here generalize well for tuning the
 implementation for inputs along other dimensions.
 
-TODO: show benchmark code, and benchmark plots
+We use likwid-bench
 
+{{<fig key="likwid-bench-copy" src="/images/likwid-bench.png"
+   caption="Speed (MB/s) achieved by the `copy` and `copy_avx512` benchmarks in likwid-bench"
+   Align="center">}}
 
-
-We use likwid-bench (TODO: add link, explain the benchmarks)
-
-TODO: plot these numbers
-TODO: redo with SMT disabled
-
+Reproduce using the following commands:
 ```
 $ for size in 16kB 64kB 256kB 1MB 4MB 16MB 64MB 256MB 1GB 4GB; do
-    bw=$(likwid-bench -t copy -w S0:${size}:1 2>/dev/null | grep "MByte/s" | awk
-	'{print $NF}'); \
-	echo "$size $bw"; done
-16kB 78409.12
-64kB 77420.82
-256kB 78184.41
-1MB 76051.29
-4MB 76036.79
-16MB 61339.87
-64MB 34870.66
-256MB 29974.75
-1GB 30401.51
-4GB 30270.25
+	bw=$(likwid-pin -c 1 likwid-bench -t copy_avx512 -w S0:${size}:1 2>/dev/null |
+	grep "MByte/s" |
+	awk '{print $NF}'); \
+	echo "$size $bw";
+  done
+
 
 $ for size in 16kB 64kB 256kB 1MB 4MB 16MB 64MB 256MB 1GB 4GB; do
-    bw=$(likwid-bench -t copy_avx512 -w S0:${size}:1 2>/dev/null | grep
-	"MByte/s" | awk '{print $NF}'); \
-	echo "$size $bw"; done
-16kB 308507.49
-64kB 148141.92
-256kB 152178.57
-1MB 130479.16
-4MB 123643.21
-16MB 74869.02
-64MB 36020.78
-256MB 27302.26
-1GB 26955.80
-4GB 26570.57
+	bw=$(likwid-pin -c 1 likwid-bench -t copy -w S0:${size}:1 2>/dev/null |
+	grep "MByte/s" |
+	awk '{print $NF}');
+	echo "$size $bw";
+  done
 ```
 
 ## First SIMD Attempt
@@ -136,7 +116,7 @@ There are three parts to the loop body.
    result and update output counter/pointer.
    
 1 and 2 are straightforward in most SIMD implementations. Let `N` be the width
-of the SIMD registers (TODO: add note on register width vs lanes). E.g. in
+of the SIMD registers. E.g. in
 AVX-512 for loading 32-bit values, `N = 512/32 = 16`.
 
 1. Load into a SIMD register from `&input[i]`
@@ -221,26 +201,32 @@ int *copy_if(int const *input, int *output, size_t n, const Predicate<int> &p) {
 
 [Check it out on compiler explorer](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM2akrgAyeAyYAHI%2BAEaYxCAArADMpAAOqAqETgwe3r7%2BgemZjgKh4VEssfHJtpj2JQxCBEzEBLk%2BfgG19dlNLQRlkTFxiSkKza3t%2BV3j/YMVVaMAlLaoXsTI7BzmSWHI3lgA1CZJbngsLGEExGEAdAgn2CYaAILPL8xsCqlMm4fIAGtjgB2Kyvd4ETAsVIGSHHU4EACeqUYrEwhxexGAj3e42IXgchyKWQAbuiTKD3odDtFUJ5DqgUcQmERiBAlhA0AxxhiseYAGyHFrAJb/ATjAUgsEvanU4iYAjrBhCrHw7CHDQnaXUikAESpx1e1Np9MZcRZJHZnPFBF52LM/MlwtFXIlDqlBrlCqVKuAao1WoNevewaS0ohUJhLPJpxxrzxBNtxMcZJObgA%2BumWAkuGY8I8PUbDpmLkwFACuIKzczWVbXbaSzm806XTbJRTtbLqfWhV4iIcAF5xVDw3XFi5N9NKAhD4iodOYVJ4JJmdmBotd%2BWK4jKrPZ3Pp5DQ4AEBdLldZssAiBMUiD4dLdcy2XB8Eb4t7q%2BVhlMi1sjk9o2ub5g6LZityBDtpS77djavb9rOI4nGOe6TtOiFnsuq6PmGnqyluPqoQeR6pCemEXiwV43neiE4Z2OrAvqRahp2EbQrCMZuJC7HRvCXHIqibAFvsZYKIcyjyvgoiQnGLxXIcABUaCpIi6Z4FQEDyT2ClhKkfZ3vJClrAQekEHemRDumtoMHePYSZgUnRmmVwFgKqSih2Bo9kwfYjiSqSjuJkl4NJmBpkBzZJNga64UW9aYKoqTEPBfn0MqyGHJWWrUgA9DlhwQE2hz5QAHKK%2BUWZgqAaVcdFeTaCVJSlhxeAwc60LQgVmE%2BsEQY1yU%2Bf2eJ4EcGUkmliktW1ni0D1zUKOlSRjsqAC0BXpWYCSHMNWB1UWhnGYFxmmXN/DJRAlVWYceCBZqYbXXx20MNlN3WBlO2YB50HPrl%2BVcLchy0KgTDoIcVBziwhxsCwJCItdggjgOFyHPKwB4OMcR4d5vmHCSakMFwgVEWY6ZAyDXjkauul9scljXXtP3gTyg1%2BfjZhExOB5k%2BgFOLlhmkMKZtMWA91i42lDPPAAnHlhxmADmAkmIXi8UlDkhbx/bAAqRLBaFUNXljcElpR5bfiwhNjakEB42EXAM12gGfmbgosOzVs22zksaDL%2BVJLchMeIIeDAF4awKLQcPjCQ6JK94mBieDqCQ0jkOo%2BjkLJQA7ggcToqbQLRIQ11iVweGy1gKIMFgDDIHgCeHMAYgx2AYB4cTl7loeydqwofespgvPnquxl3hbd62wTDuytj/boJbS3jiw6bpKkyCCOmXgrhAFvT9SHcF930Lyn30fykP/OHWL89j4EuNe3NvXMzj6Du4v8/C0vK%2BMuvp5b6ubtva%2B0OP7dmXhUjoF4sdGm6QriY3fFfSwGVX5zVfM%2BWWCBDDoHoCjKETAwhYGIAaM6BUWai0XgtF6j1nr3RAlYSwX16LXSoAVa21NIIJAsPmBIuoliMKDD7akRkaYZXYSYTh3D9SxTeIIhkfY3pIOkV2NBDEmLPgIjuORkFpFoN0a8EkqARpgzpALW02l2EGUEIpaBZltp4EstZfh75AQgBQIyVS6kBamTvDYu8Nl/gAlccmPAqZTguSip5RiktGIcBWLQTgCReB%2BA4FoUgqBOBuAUSLBQawNjkjMEkHgpACCaFiSsQJkhQFS0kPyDQXBgRSy4EkZpJVAjxI4JIJJpS0mcF4AoEAGhimlJWHAWASA0DQjoHEcglAJlLnoPEESRgAhcEGTQWgmd%2BkQGiN0ouzBiCIk4EUvZLREQAHlojaEwA4I5vAJlsEEGchgkdulYGiF4YAbgxC0H6dwXgWBKJGHECk/5eB5QOBCQnbpCVrl9i2EUuB7TUm0DwNEZkByPBYG6dcc4tzSBkmILSJQuo8FArCKAEFKwqAGGAAoAAavXLOZyq54v4IIEQYh2BSBkIIRQKh1AgtILoFIBgjAoCyfoVF/TIArEZA0X5K1xjoGQqYJBlgCmHBWpRDYDwloDgYASyQmqzlJE1QAdW%2BeahK1wmC8FQASm4WBpXsm6NchoLhq5TD8FwII1d5jDHiD64JAgvV6GDQwf1lQRg%2BrsG63oEw2ieA6HoWNEKBB9FaJGxYMaE2hpzXMMIQwo2BpWDk9YmwJBxISV0wV6SOCHFUCVfkK1%2BRGqWX6AIAdbgaAKrgQgJBaaFKWLwEplLSAQHGVQYAMzOSMEzj8eUghflFLmVM4gEQ0ScEbc21t/xRUdvlv9VJ6tWQjT0MK0g%2By5xZ2uJgOoTBETGW6amyE6AABirU03JP4KgUxTMCAKUsQBu8rVMjAHCKDIGRglicGKfKTAZ6NBVo4Iky93S61uDfQAcQbU2ltbb91y0Pd23t%2BBWSDp9YcDwkyFmDqSMOoZY6J0gF8RQa0NG4gbrYFuvDu721Ea7cesjJAz0%2BrZcIUQ4huXib5WobpF6s7MlSLc5DqHkmpLrWcvsQtqq4Z3QRwwB7BMFWo/MuIdGGOjq0Hw0gucQYjBdYEhI/JbjAg0MkKWrSNBNv5PyLgUt9CcE6Wh2tvTbB6Cs2UwLHAzA1o02FyLNmCWZGcJIIAA%3D).
 
+{{<rawhtml>}}
+<iframe width="800px" height="800px" src="https://godbolt.org/e?readOnly=true&hideEditorToolbars=true#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjEIABs8aQADqgKhE4MHt6%2B/ilpGQIhYZEsMXGJtpj2jgJCBEzEBNk%2BfgF2mA6Z9Y0ExRHRsQlJCg1NLbntY32hA2VDiQCUtqhexMjsHOYAzKHI3lgA1CbbbngsLKEExKEAdAgn2CYaAILPL8xsCslMG4fIAGtjgB2Kyvd4ETAsZIGSHHU4EACeyUYrEwhxexGAj3eo2IXgch1S6UcADd0SZQe9DocoqhPIdUCjiEwiMQIIsIGgGKMMVjzPFDo1gIt/gJRgKQWCXjSacRMAQ1gwhVj4dhDhoTtKaZSACLU46vGl0hlM2Kskgcrnigh87FmeKS4Wi7kSh1Sg1yhVKlXANUarUGvXvYPbaUQqEw1kU044154gm24kZcknNwAfXTLAArFwzHhHh6jYdMxcmAoAVxBWaWWyra7baXc/mnS6bZLKdrZTSG0KvERDgAvWKoeG6ksXZvppQEYfEVDpzDJPDbMwcwPF7vyxXEZVZnN59PIaHAAiL5errPlgEQJikIcjxYbmWy4Pgzcl/fXquM5kW9mcr2TZ5gWDqtmKPIEB2VIfj2Np9gOc6jic477lOM5IeeK5rk%2BYaerK24%2Bmhh7Hskp5YZeLDXre95IbhXY6sC%2BrFqGXYRtCsIxm4kIcdG8LcciqJsIW%2BzlgohzKPK%2BCiJCcYvFchwAFRoMkiLpngVAQApvaKaEyT9veCmKasBD6QQ97pMO6a2gw969pJmDSdGaZXIWArJKKnYGr2TD9qOpLJGOElSXgMmYGmwEtts2DrnhxYNpgqjJMQCH%2BfQyooYcVZajSAD0uWHBAzaHAVAAcooFZZmCoJpVz0d5NqJclqWHF4DDzrQtBBWYz5wZBTUpb5A54ngRyZaS6VKa17WeLQvUtQoGXbOOyoALSFRlZjZocI1YPVxZGSZQUmWZ838ClEBVdZhx4EFmphjd/E7QwOW3dYmW7ZgnkwS%2BeUFVwtyHLQqBMOghxUPOLCHGwLAkIiN2CKOg4XIc8rAHgoyxPhPl%2BYcpLqQwXBBcRZjpsDoNeBRa56f2xyWDd%2B2/RBvJDf5BNmMTk6HuT6CU0u2FaQwZl0xYj3WHj6WM88ACc%2BWHGYgOYKSYheHxyWOaFfEDsACpEiFYXQ9e2PwaWVEVj%2BLBE%2BNyQQPjoRcIz3ZAV%2B5uCiwHPW7b7NSxossFdstxEx4gh4MAXirAotDw6MJDosr3iYOJEOoFDyNQ2jGOQilADuCCxOiZtAlEhA3eJXD4XLWAogwWAMMgeCJ4cwBiLHYBgPhJNXhWR4p%2BrCj92ymB8xea4mfelv3nbhOO7KOMDugVvLROLDpqkyTIII6ZeKuECWzPNKd4XPfQvK/cx/Kw8C0d4sL%2BPAR497819SzuPoB7S8LyLy%2Br0yG9ntva53Y%2Bz9ocAOHMvDJHQHxE6tNUhXCxh%2Ba%2BlhMpv3mm%2BF8csECGHQPQVGUImChCwMQA051CqszFkvRar0novQeqBKwlhvoMRulQQqNsaZQWzBYAs2ZdSLCYUGX2NJjK00yhwkwXCeH6jim8IRjJ%2BzvWQTI7s6DGLMRfIRXc8ioIyPQXo14pJUCjXBvSQWtodIcMMoIJSMDzI7TwFZGyAiPyAhACgJkakNKCzMveWx95bL/ABG45MZJwqnFctFLyTEpZMQ4MsWgnBsy8D8BwLQpBUCcDcIo0WChVjrApGYbYPBSAEE0HE5YQTJBgOlpIeIGguDAmllwbYLTSoBASRwSQySynpM4LwBQIANAlLKcsOAsAkBoGhHQWI5BKCTOXPQOIokjBmDMFwIZNBaBZwGRAKIPTi7MGIIiTgxSDmNERAAeSiNoTopTuC8EmWwQQFyGBRx6VgKIXhgBuDELQAZ9zSBYCokYcQqTeD4HlF0ck/y0mJU6P2TYxT4EdLSbQPAUQWRHI8FgHp1xzgnN4OSYgdIlC6nwSC0IoAwXLCoAYYACgABqDds4XOrgSmQggRBiHYFIDl8glBqB6bobY%2BhDDGGyfodFAzIDLCZLUHknBVqjHQChUwyDLCFMOKtKi6wHjLUHAwIlkgtUXO2FqgA6r8i1iVrhMF4KgIlNwsDSo5FUGomQXA1wmH4LggQa79FKOUPQITMjeuDQUeVAbBhxF9R0LodRphhtjdUW53RphRvmDG2wibPCtD0KMXoGag0OxWGsDYEh4mJO6WC3pHBDiqFKvEVa8RjXLL9KswOtwNCFVwIQEgdMimLF4HcrQoyJlUGALMrkjAs4/HlIIf5xT5nTOIOENEnAG1Npbf8AwRh5YKwBrC/AbJRp6GFaQQ585s7XEwNUJgiITI9LjZCdAAAxNq8aUn8FQGY5mBBFJWP/feNq6RgBhDBsDIwixOAlPlJgU9GhK0cCSRenpGSOBuFfQAcXrY25trbd3toPV2ntx7%2B07F9YcDwUzFkDu2EO4Z1LSAQCQH4ig1oaOxDXWwDdeHt1tv3Z2o9fanV6H4Jy0Q4heXif5SodQNbz3ZxZMkAlSGUMpLSehi5/ZhY1Vw1ugjYrBOHsKtRhZsQ6MMZHeU0gedQZDFdUE7M8RbjAg0NmbY0s2kaEbYkLg0t9CcC6ahmt6H%2Bl6Gs/wwLHAzDVs030xjo7lhEvSM4SQQA"></iframe>
+{{</rawhtml>}}
+
 A few observations:
 1. The loop body is now branchless - I expected this to have virtually no bad
    speculation
 2. I need to move the mask to a general purpose register (GPR) in order to get
    its popcount.
 
-
-
-
 ## First Moment of (Bitter) Truth
-**TODO:** better plots, write e.g. a dedicated plotting script using Makie.jl
-![](/images/throughput-items.png)
-![](/images/wall-time-unoptimized.png)
+{{<fig key="basealine-throughput" src="/images/baseline-throughput.png"
+   caption="Throughput (MB/s) achieved by the `std::copy_if` and the AVX-512 implementation."
+   Align="center">}}
+   
+{{<fig key="baseline-walltime" src="/images/baseline-walltime.png"
+   caption="Wall Time (ns) for `std::copy_if` and the AVX-512 implementation."
+   Align="center">}}
 
-We got problems, chief. The achieved throughput is ~1e9 items per second, or
-~4e9 bytes per second *for all input sizes*, which means:
+We hebben een serieus probleem; the achieved throughput
+~4 GB per second *for all input sizes*, which means:
 1. It's *slow as shit* since the memory subsystem is capable of sustaining ~26.5 GB/s
    for a 4GB working set, and ~300GB/s for a 4KB working set, as shown in
    [by the throughput upper bound for copying data](#how-fast-is-fast).
-2. It's not even memory bound!
+2. It's invariant with respect to problem size, and most likely not experiencing
+   memory hierarchy effects.
 
 At this point my first guess was that one of the AVX-512 instructions has a much
 longer latency or much lower throughput than I expected. We have three AVX-512
@@ -249,15 +235,16 @@ instructions.
 2. SIMD comparison `vpcmpnled {zmmr} {zmmr}`
 3. Compress mask store `vpcompressd {zmmr} {mem} {mask}`
 
-Experience says that 1 and 2 should not be the problem (if they are I will jump
-off a bridge). So, I could investigate `vpcompressd` register to memory
-directly.
+Experience says that 1 and 2 should not be the problem (I will eat thumb tacks
+if they are). So, I could investigate `vpcompressd` register to memory directly.
 
-BUT, (IMO) it is much more fun and illuminating to systematically
-drill-down using a more generally applicable top-down approach that also gives
-us a brief tour of CPU microarchitecture. If that sounds interesting to you, 
-keep reading, otherwise skip to the [end](#the-fix-and-final-moment-of-truth).
-This exact approach is outlined in the paper "A Top-Down Method for Performance Analysis and Counters Architecture" [^top-down-pmc-paper].
+BUT, (IMO) it is much more fun and illuminating to systematically drill-down
+using the generally applicable top-down approach that also gives us a brief tour
+of CPU microarchitecture. If that sounds interesting to you, keep reading,
+otherwise skip to the [end](#the-fix-and-final-moment-of-truth).  This exact
+approach is outlined in the paper "A Top-Down Method for Performance Analysis
+and Counters Architecture" [^top-down-pmc-paper] and has been written about by
+other bloggers as well [^easy-perf-tmam].
 
 [Performance
 counters](https://en.wikipedia.org/wiki/Hardware_performance_counter "Hardware
@@ -266,9 +253,6 @@ where a bottlneck lies. We will not even reach for a profiler and just use
 `perf list` and `perf stat`. Making sense of the information that a PMC system can provide us demands
 at least a high-level understanding of CPU microarchitecture[^cpu-uarch], and having some numbers for your specific microarchitecture on the back of your hand.
 If you already understand the terms frontend, backend, uops, branch prediction, instruction decoding, op cache etc, then you can jump straight to [the drill-down](#a-performance-analysis-methodology-using-performance-counters).
-
-
-
 
 ## A Crash Course on CPU Microarchitecture and PMCs
 This is going to be _very brief_ as far as expositions on this topic go. There
@@ -315,12 +299,13 @@ retired per cycle for a given microarchitecture. But, a high retiring fraction
 DOES NOT necessarily mean no room for more performance. Microcode[^microcode]
 sequences can hurt performance and should be isolated separately.
 
-## A Performance Analysis Methodology using Performance Counters
-This method, along with a recommende PMU architecture, is described in Yasin's
-paper [^top-down-pmc-paper]. The main idea is to start by categorizing CPU
-execution time at a high level first. This flags (reports a high fraction value)
-specific domains (FE bound, BE bound, bad speculation, and retiring) that should
-then be investigated further while ignoring other domains. Recurse.
+## The Top-Down Analysis using Performance Counters
+This method, along with a performance monitoring unit (PMU) architecture
+recommendation, is described in Yasin's paper [^top-down-pmc-paper]. The main
+idea is to start by categorizing CPU execution time at a high level first. This
+flags (reports a high fraction value) specific domains (FE bound, BE bound, bad
+speculation, and retiring) that should then be investigated further while
+ignoring other domains. Recurse.
 
 {{<fig key="pmc-hierarchy" src="/images/top-down-pmc-hierarchy.png"
    caption="The top-down hardware event groups hierarchy"
@@ -365,7 +350,7 @@ PipelineL1:
 
 `smt_contention` can be excluded because I disabled it for the core to which I pin my benchmark thread.
 
-Let's look at the level 1 results for one problem size.
+Let's look at the level 1 results for a 16MB input.
 
 ```
 sudo perf stat -M backend_bound,bad_speculation,frontend_bound,retiring -- chrt -f 50 taskset -c 0 ./build/benchmarks/ckl_algorithm_bench --benchmark_filter='BM_CopyIf_Ckl/16777216' --benchmark_min_time=3s
@@ -399,6 +384,11 @@ BM_CopyIf_Ckl/16777216   16692437 ns     16500477 ns          254 bytes_per_seco
        6.213639000 seconds user
        0.021762000 seconds sys
 ```
+
+Here it is plotted as a stacked column chart of ratios for 4 problem sizes.
+{{<fig key="level1" src="/images/level1.png"
+   caption="Level 1 breakdown for four problem sizes. There is zero bad speculation and virtually no backend bound."
+   Align="center">}}
 
 When these event groups are selected, perf automatically calculates the
 fractions that we are looking for. Let's find out if the fractions make sense.
@@ -464,38 +454,44 @@ PipelineL2
 ...
 ```
 
+Here's the output of perf stat 
+
 ```
-sudo perf stat -M frontend_bound_bandwidth,frontend_bound_latency,retiring_fastpath,retiring_microcode       -- chrt -f 50 taskset -c 1       ./build/benchmarks/ckl_algorithm_bench       --benchmark_filter='BM_CopyIf_Ckl/16777216'       --benchmark_min_time=3s
-2026-05-19T11:33:54+02:00
-Running ./build/benchmarks/ckl_algorithm_bench
-Run on (15 X 4966.64 MHz CPU s)
-CPU Caches:
-  L1 Data 32 KiB (x7)
-  L1 Instruction 32 KiB (x7)
-  L2 Unified 1024 KiB (x7)
-  L3 Unified 16384 KiB (x1)
-Load Average: 0.41, 0.46, 0.56
-***WARNING*** CPU scaling is enabled, the benchmark real time measurements may be noisy and will incur extra overhead.
+sudo perf stat -M backend_bound_memory,backend_bound_cpu,frontend_bound_bandwidth,frontend_bound_latency,retiring_fastpath,retiring_microcode \
+	-- chrt -f 50 taskset -c 1 \
+	./build/benchmarks/ckl_algorithm_bench \
+	--benchmark_filter='BM_CopyIf_Ckl/16777216' \
+	--benchmark_min_time=3s
+...	
 ---------------------------------------------------------------------------------
 Benchmark                       Time             CPU   Iterations UserCounters...
 ---------------------------------------------------------------------------------
-BM_CopyIf_Ckl/16777216   16607715 ns     16445951 ns          255 bytes_per_second=3.80033Gi/s items_per_second=1.02014G/s
+BM_CopyIf_Ckl/16777216   16788004 ns     16616390 ns          253 bytes_per_second=3.76135Gi/s items_per_second=1.00968G/s
 
  Performance counter stats for 'chrt -f 50 taskset -c 1 ./build/benchmarks/ckl_algorithm_bench --benchmark_filter=BM_CopyIf_Ckl/16777216 --benchmark_min_time=3s':
 
-    55,300,930,778      ex_ret_ucode_ops                 #      3.9 %  retiring_fastpath
-                                                         #     29.9 %  retiring_microcode       (50.00%)
-    30,848,782,565      ls_not_halted_cyc                                                       (50.00%)
-    62,568,701,896      ex_ret_ops                                                              (50.00%)
-   120,252,170,513      de_no_dispatch_per_slot.no_ops_from_frontend #     25.2 %  frontend_bound_bandwidth  (50.00%)
-    12,264,876,090      cpu/de_no_dispatch_per_slot.no_ops_from_frontend,cmask=0x6/ #     39.8 %  frontend_bound_latency   (50.00%)
-    30,850,786,559      ls_not_halted_cyc                                                       (50.00%)
+     8,279,342,938      ex_no_retire.load_not_complete   #      0.8 %  backend_bound_memory
+                                                         #      0.4 %  backend_bound_cpu        (33.34%)
+     2,193,400,952      de_no_dispatch_per_slot.backend_stalls                                        (33.34%)
+    12,580,467,726      ex_no_retire.not_complete                                               (33.34%)
+    30,990,815,464      ls_not_halted_cyc                                                       (33.34%)
+    54,989,538,537      ex_ret_ucode_ops                 #      3.9 %  retiring_fastpath
+                                                         #     29.7 %  retiring_microcode       (33.34%)
+    30,905,255,222      ls_not_halted_cyc                                                       (33.34%)
+    62,204,599,288      ex_ret_ops                                                              (33.34%)
+   120,942,499,051      de_no_dispatch_per_slot.no_ops_from_frontend #     25.0 %  frontend_bound_bandwidth  (33.32%)
+    12,443,310,206      cpu/de_no_dispatch_per_slot.no_ops_from_frontend,cmask=0x6/ #     40.3 %  frontend_bound_latency   (33.32%)
+    30,880,935,531      ls_not_halted_cyc                                                       (33.32%)
 
-       6.293425568 seconds time elapsed
+       6.325126529 seconds time elapsed
 
-       6.205422000 seconds user
-       0.027691000 seconds sys
+       6.231692000 seconds user
+       0.029639000 seconds sys	
 ```
+
+{{<fig key="level2" src="/images/level2.png"
+   caption="Level 2 breakdown for four problem sizes. While the super heavy frontend bound exists, most of it is frontend latency bounded, meaning that no uops are delivered at all to the backend in a good 40% of cycles. However, the more alarming statistic is the 29.7% retiring microcode and only 3.9% retiring fastpath; a good 88% of microcode uops!"
+   Align="center">}}
 
 We hebben een serieus probleem.
 - `ex_ret_ucode_ops` (retired microcode ops) - Of the 33.8% or so retiring ops,
@@ -746,10 +742,77 @@ int *copy_if(int const *input, int *output, ssize_t n, const Predicate<int> &p) 
 }
 ```
 
+Where do we stand now?
 
-## Production Grade SIMD
+{{<fig key="optimized-throughput" src="/images/optimized-throughput.png"
+   caption="Throughput of std::copy_if and fixed AVX512 implementation"
+   align="center">}}
 
-## What Next?
+{{<fig key="optimized-speedup" src="/images/optimized-speedup.png"
+   caption="Throughput of std::copy_if and fixed AVX512 implementation"
+   align="center">}}
+   
+Much better, {{<figref optimized-speedup>}} shows that we finally have
+ substantial speedups ranging from ~10x to ~40x.  over `std::copy_if`
+
+## What's Left
+Of course this implementation is still _very_ crude - lots of parameters are
+hardcoded:
+1. Loop unrooll count
+2. SIMD width
+3. Element type
+4. Implementation of compressed store
+5. The overall implementation of `copy_if` in general
+
+There are multiple ways of implementing a SIMD version of `copy_if`,
+specifically the implementation of `compress_store` at two of them. The former
+is incredibly shit on Zen 4, but it should hold up just fine on comparable Intel
+microarchitectures and on Zen 5. Other implementations, that were mentioned a
+CppCon talk [^cppcon-advanced-simd-algos] by one of the co-authors of EVE,
+include:
+
+1. [Tiny lookup
+   tables](https://stackoverflow.com/questions/45506309/efficient-sse-shuffle-mask-generation-for-left-packing-byte-elements/45515947#45515947)
+   by aqrit on stackoverflow.
+2. [Using BMI2 intrinsics](https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask) (by Peter Cordes, prolific stackoverflow user)
+3. Switch + shuffle by @Z Boson on stackoverflow [^zboson-pending]
+
+Some of these will be faster than others depending on the platform, predicate,
+and the input distribution. Some, including the straightforward AVX512
+implementations, will be straight up impossible on some platforms because the
+requisite instructions might not be available.
+
+There are also several possible ways of providing higher-level hardware agnostic
+abstractions on top of SIMD intrinsics in order to present a generic interface
+that exposes such configuration options. C++26 includes such a foundational SIMD library
+in the form of [data-parallel types](https://en.cppreference.com/cpp/numeric/simd).
+ C++ compiler release has implemented this.
+
+There are also SIMD library like [highway](https://github.com/google/highway), [xsimd](https://github.com/xtensor-stack/xsimd), [vectorclass](https://github.com/vectorclass/version2), [EVE](https://github.com/jfalcou/eve) etc, which handle a
+lot of these implementations and configurations for you. Here's a zoo of
+`eve::algo::copy_if` configurations on [compiler
+explorer](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjEIACcAOykAA6oCoRODB7evv6p6ZkCIWGRLDFxSbaY9o4CQgRMxAQ5Pn4BdpgOWQ1NBCUR0bEJyQqNza15HeP9oYPlw0kAlLaoXsTI7BwA9NsA1CYAzAAiR6cnZ5cX1%2Be3V3c390%2BPLw9vz%2B%2BvH99fv5//PwBf2%2BGgAgrs9somGNMHtQkQ9ggCAQUgoQLtgBgop4CAA6EjAfZ7ADuhCQJjBEL2ew8LBSdFiexAe1UAA4AGwAWnZkj2yAMRj2XFZ1mpEBIe2AyGQQsO1iWFPBRL2ADEDMAFNTqczOWN0GdTJZrGYNHtOQB5Q5mlhMABuqjMZuO4WO2AscgA4oqqXsQlFiE0AJ7avZMdDoA5mMyYW2YcyO214Jh7AgIWF%2BgPEPCYTVRLzIgR7CAGAg5ggKynbb37ABqTSTgk1qCoexj7BAYkxIBQqBSgYA%2BngWwoEKhiQw9jFaGPcdXq3twqhS3tC/GFEwqLDbZqvAx15v48y293O6hu2g%2B4OW2JiUxAzulJrU7CAFS7/eYF/z/jEFgrlvHj2dLEDmCj9hewa7lgxApmmiKoBgRZKLCEFXriCApCkIDztSJjshoIEEOsE6AWgwGgeBvaBiYACsFiAe%2BG5xjRpx0Vge6ENRLFHFY%2BF7Esk5dEwXhKLBcaVqGtCYlmqZ/oQdgtgQAbIAA1k%2BcFrCi%2BacgGRiwtiUGaomyZ4RoKmYJgKT9jQxBjKZs4SUIqBiXsH7bIxm6hqoeCaj5K4MLQwaYKoaRKBGhbPns07Epy9CxrQ86kag5EKGBEF8mIBhRPQpB7AwS7%2BS5p4yQgLC4nsADqCBMAQewvj5L4pruTDZeJSqFahQ7YZWOFCuVWBUMJtC1Vqo1jeNE2ckc2B7OxSj9ppKT5pGFihvmzm7sQni0Cta0ImIeDAAwvVmOVgGnt2c2YAt%2BZLSNE1mtNrYhbQeDIIQs2MKJEDrmwoaagNQ3lr1hxnbGJ5SWeIAKCkTTzYty0PVNhwzURYQRj%2BeyxsQwabsSiLyXs%2BwgcAPmlsQvWSGD7YXSA%2BX9pt22hMAD3UsjM2M7QCWHG4XDTb1NHUxDXZ06g/YHUdzOs2zT0KCpeApEVr1HZyKQWTtKRbdOwBeG1PrskLHaQ92wVqxxsbgZlLX0KN7N5WLEsMFLor05zr2CqKGRGPQ/aw6lvWJIbtP4ImGStf2UQDqIxD4MwO12zUeBYC5Npy5g6Cco0dCuaWKS9dLBeF%2BNEBhOnmr047UsIlEhCYBW7XUqyQfGyAP6bJbMehGIRxuCKKNjXb9KqaGrlq%2B9NAykIACSACyxwkknqa9fE5Uw3D10I7VLsO8rTse5Y9sMwwWvuyzYxMKp6dY0mKYBvJJiJFYiSnD1EkACpwZr6dvTVsKhK2F8EBY3rIYWqflIrTznrFIcpYIyYAAI5eDwLaMQjBarNnzgcOitFjgQGEgiNAe4CDmHZHlASD9VqEWInlA4/cNA8QOM/ecgIWHAjYUCDhrDOHsK4bwnh/DuGcLBIqcwhxQj8i8MnHubZtgsAwF4eg2xTzoUwvzYRZgxEMAkVInma9jooxEWCESUsp4TlofPeEfIBBjC/IcKwRivYs3NMtM4cJBC2PsaCRUhCYQhRgvg5yoVMixnMVgqwLE8HrSsUQkhZDGGUMwERYgE4JxPXoXYxh5xPGKmCuTVJUY3Dxj2s5TqVB%2BwaC4P2QGCiCAQFMXsKguV6m0Fys49BjS9htJXLQeuFDFSjSock1s4MjYi1KRAfpE09Tdj0RQjpCVn65WmdDWGx1H7Nlyp4B%2BxxcpBMcLGBUdiRFMOEWCXJsR8lmEKVGYpVjLxDnKWYKpX1MB1InB05prTlobM6d8npxzPEDMSdQ86LdSm0XoiM4OLybpaWIREyZ41lmzMfvM7ZSyCDoBmasihPytmLL2Hs5BdceLHJfl4s5qg8mRiuUUgJdyBwPI0Icfsa9bKvPqR8icLTfntK%2Beg/5wjH6Ir2IMkiUKwVUSvBC0FIs2Xw1uvmHBEywQPWRTi1FuUFk7JzlilZhhcUdPxTqolBzSVCvJTkqlFyaXXMdPS0p5TJD9ldsfbabyGlNO5fy/8PrPC9OFaqrUYrhk00lfcqgMqJUi1dSfZmyqRWjXVQazVUV0W6uxSmiweLtW7MKPsklRyLWGNBOcoZ8Y7W3MdRoGiLqd6HQYB6rlUU/UdK6f6gFIqQ2yqhuCuiPbuwV13vGhFQakWYszWsiwaKCXJqnTm9NprC3ZJORS0t1ry0FLpVE6t7J%2Bymy%2BsSptXqW28t9WejtQrAXBuBUMgdPYI1RrDSLA95trqiC5tbZiuDE1ajnXMrV6b/3rKNbmwl%2BbiWHJXZayl1KK3boIVKpliQqnIJ8ngVqx69ifIvW2v5Abr3Um7dG3tSHI1jrGk%2B4WUMQ7ofDpHDusdu7cQo6NKjoyoZDobSOn9rGpkTv1VOmdOrgPZtA4uiDZqi1eNXVauDW6bkOrI%2BU1kjHWRYZw%2B2vDAqCNdtveK59pHH39pI92Nu76mhMe5r3fmo7QRqoEyi6dgHZ2OY1WJzZYGl1QbJSWstlzK1KYjeU%2BIrLYbsrrY7OtbsNPetw36wVMnCOiv06G6j54yPsdpkpJg99A32Ymve%2BVG9FUEFIL%2B6k96uOSyMOVvjlXTOiyPnGow2yE31bGqJ4TGK9VOYXQS7z5qZPHA4CsWgnAaK8D8BwLQpAzwcGuVYA%2BCg1gbFhKIngpACCaFGysFSIBJCgzMPESQ%2BEuCJHiFwQ413WQBHGxwSQU2dtzc4LwNEGgts7ZWHAWASAyL0noGQCgEB/sMjiPyQwwAoxcA%2BzQYasQ0QQCiM9muzAcacE26joM5oojaC6Nt7gvAyJsEEOaAKgZntYDzMANwmU0SE9IFgG03stizfwCBbosZ6ezeCl0fMWxNvwhqM916/ogweCwM9pSeAWAY94NjbEShjiYGZ8AU%2BX2%2BDqgUDWbMxJzRmzlzIQQIhUESGkPwQQigVDqBmzoEAhx9CQ5QNYaw%2BgMNolgMwNgIA2ykGxiAJSu4VJLBWL2Ooe5OC6kxQaF3lgNHWiaMgBAZwABeDBsa8gtFaTkFVMpmgqrkgMvBUDYyzFgD3EAVidG6M4CArhJh%2BC4IEBg6ABhlAqHoIlAgG%2Bd4g8UOY7fhhN%2Br%2BH3oExPBtD0CPnoMw29DDiMPmYPfF99DnwsBfVfVubAkGNibT3bcvY4CyDk3JeQQ8FFGXEXBcSmggLgQgEoNtLF4ATrQ32/tUGAOQSgmxBCxHC2gvTptqDoDuEKwFsGyFyDyHyAKCzJftfjzvgEQGXnoLoA7mjltMSEpOrHeJpM9iPunCqLuDXtNtWpUtUsNJwFtiBJgEnCABoLvhwJNqQNNrNvNm4CqB6MflAWfrAXsPATfkWPfsgZGIcE3jSMlADoyKIocM/p9rbu/iAJvN/iDpIWDmAd7hwJAafjAZDvwadAgbwN/MgXQU3hbsIB%2BuwFIEbvIEoGoM9mgaQMSAGFhITowcwawcXpwG0ndP%2BNwToefnAQYYIRALSFITBDIXIa/rtqQGmGGMMJXqQPtjRAbIkDWocPELdhoByOyOyFwPEPoJwI9iwc9vNm9noNESHoURwGYPvmwa9vIW/isNjBkM4JIEAA%3D%3D%3D).
+I am planning to take all these libraries for a spin and analyze their performance and codegen in a series of subsequent blog posts.
+
+## Conclusion
+When I started this, I expected it to be much simpler. Lots of takeaways
+from this whole exercise.
+1. We (finally) managed to get a speedup of up to 40x with the AVX512
+   intrinsics. There is most likely still room for more tuning.
+2. `vpcompressd (M512, K16, ZMM)` is very poorly microcoded. In general, check
+   with sources like the
+   [uops.info table](https://uops.info/table.html?search=vpcompressd%20(M512&cb_lat=on&cb_tp=on&cb_uops=on&cb_ports=on&cb_ZEN4=on&cb_measurements=on&cb_avx512=on))
+   before committing to a specific intrinsic when writing manual SIMD programs.
+3. If you have determined that your code is CPU-bound, Yasin's top-down analysis
+   using `perf stat` is a great starting point for systematically drilling down
+   into root cause of the bottleneck.
+4. 
+5. Use IBS on AMD CPUs for high confidence sampling of CPU microbenchmarks to
+   not be thrown off by skid (no pun intended).
+6. Consider using cross-platform SIMD libraries like EVE, highway,
+   xsimd etc for portable performance.
+   
+Most likely I will cover EVE in the next SIMD related article.
 
 ## Appendix
 
@@ -757,7 +820,7 @@ int *copy_if(int const *input, int *output, ssize_t n, const Predicate<int> &p) 
 We would like to reduce variance as much as we can. The canonical reference
 document for this is the [article on reducing
 variance](https://google.github.io/benchmark/reducing_variance.html) in the
-Google Benchmark docs (TODO: make this a dedicated reference)
+Google Benchmark docs.
 
 #### Sources of variance
 Quoted from the [article on reducing
@@ -883,8 +946,12 @@ and
          ables an optimization aimed at minimizing interprocessor interrupts.
 ```
 
-#### Increasing scheduling priority of my benchmark thread
-TODO:
+#### Increasing scheduling priority of the benchmark thread
+`chrt -f 50 <cmd>` sets the scheduling policy to first-in-first-out (FIFO) with
+scheduling priority 50. The valid range of priorities is 1-99, and so the
+process initiated by `<cmd>` can be preempted by any other process with a
+priority >50.  By default `perf stat` includes in its output the number of
+context switches incurred a process's execution.
 
 #### Putting it all together
 ```sh
@@ -904,6 +971,9 @@ TODO:
 ```
 
 ### llvm-mca
+For some reason llvm-mca 22.1.5 predicts an IPC of 3.46, while the achieved
+IPC was 0.11. Might be worth looking into the scheduling model.
+
 ```
 $ llvm-mca
 .loop:
@@ -965,10 +1035,13 @@ Instruction Info:
  1      1     0.50                        jne   .loop
 ```
 
+
+
 [^1]: Those of you already experienced with AVX-512 on Zen 4 already know where this is going.
 [^cpu-uarch]: See ["Modern Microprocessors - A 90 Minute Guide!"](https://www.lighterra.com/papers/modernmicroprocessors/) for a more elaborate exposition.
 [^hennessy-patterson]: Consider Appendix C and Chapter 3 of [Computer Architecture: A Quantitative Approach 7e](https://shop.elsevier.com/books/computer-architecture/hennessy/978-0-443-15406-5 "Elsevier link (not sponsored)") for a very serious exposition on CPU backends and branch prediction.
 [^top-down-pmc-paper]: Yasin, A., 2014, March. [A top-down method for performance analysis and counters architecture](https://www.researchgate.net/profile/Ahmad-Yasin/publication/269302126_A_Top-Down_method_for_performance_analysis_and_counters_architecture/links/58031fc108ae6c2449f7feda/A-Top-Down-method-for-performance-analysis-and-counters-architecture.pdf). In 2014 IEEE International Symposium on Performance Analysis of Systems and Software (ISPASS) (pp. 35-44). IEEE.
+[^easy-perf-tmam]: Denis Bakhvalov: [Top-Down performance analysis methodology](https://easyperf.net/blog/2019/02/09/Top-Down-performance-analysis-methodology).
 [^zen4-loop-buffer-disabled]: Usually there is also a loop buffer, but it's disabled on Zen 4 as it is mostly a power usage optimization. See [AMD Disables Zen 4's Loop Buffer](https://chipsandcheese.com/p/amd-disables-zen-4s-loop-buffer "Chips and Cheese article") by Chips and Cheese.
 [^microcode]: Not to be confused with micro-operations (uops), which are the production of custom hardwired decode logic, microcode is a series of simple instructions that replace custom hardware logic executed by a microcode engine. See the [Wikipedia article](https://en.wikipedia.org/wiki/Microcode).
 [^instruction-length-decoding]: On variable length instruction ISAs like x86, this determines instruction boundaries and has been reported as a bottleneck sometimes. See [^top-down-pmc-paper].
@@ -976,3 +1049,5 @@ Instruction Info:
 [^mersenne-zen4-teardown]: [mersenneforum - Zen4's AVX512 Teardown](https://web.archive.org/web/20241204180018/https://www.mersenneforum.org/node/21615#post614191)
 [^amd-ibs]: [Instruction-Based Sampling: A New Performance
 Analysis Technique for AMD Family 10h Processors](www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdfgg)
+[^cppcon-advanced-simd-algos]: [Advanced SIMD Algorithms in Pictures - Denis Yaroshevskiy](https://youtu.be/YolkGP-rb3U?si=0FUJ6C7-ev6Z94Vi&t=800)
+[^zboson-pending]: Still looking for this one, please let me know if you know which StackOverflow answer this refers to.
