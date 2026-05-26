@@ -21,7 +21,7 @@ Which means that dead simple algorithms like map/transform, reduce,
 adjacent_difference etc are out, as [they are very autovectorizable](https://godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(filename:'1',fontScale:14,fontUsePx:'0',j:1,lang:c%2B%2B,selection:(endColumn:2,endLineNumber:11,positionColumn:2,positionLineNumber:11,selectionStartColumn:2,selectionStartLineNumber:11,startColumn:2,startLineNumber:11),source:'%23include+%3Calgorithm%3E%0A%23include+%3Cnumeric%3E%0A%23include+%3Cvector%3E%0A%0Aint+reduce(std::vector%3Cint%3E+const%26+input)+%7B%0A++++return+std::reduce(input.begin(),+input.end(),+0)%3B%0A%7D%0A%0Avoid+adjacent_difference(std::vector%3Cint%3E+const%26+input,+std::vector%3Cint%3E%26+output)+%7B%0A++++std::adjacent_difference(input.cbegin(),+input.cend(),+output.begin())%3B%0A%7D'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:43.29460179133382,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang2210,filters:(b:'0',binary:'1',binaryObject:'1',commentOnly:'0',debugCalls:'1',demangle:'0',directives:'0',execute:'1',intel:'0',libraryCode:'0',trim:'1',verboseDemangling:'0'),flagsViewOpen:'1',fontScale:14,fontUsePx:'0',j:3,lang:c%2B%2B,libs:!(),options:'-std%3Dc%2B%2B23+-march%3Dznver4+-O3+-Wall+-Wextra',overrides:!(),selection:(endColumn:1,endLineNumber:1,positionColumn:1,positionLineNumber:1,selectionStartColumn:1,selectionStartLineNumber:1,startColumn:1,startLineNumber:1),source:1),l:'5',n:'0',o:'+x86-64+clang+22.1.0+(Editor+%231)',t:'0'),(h:cfg,i:(centerparents:'1',compilerName:'x86-64+clang+22.1.0',editorid:1,j:3,narrowtreelayout:'0',selectedFunction:'foo(std::vector%3Cint,+std::allocator%3Cint%3E%3E+const%26,+std::vector%3Cint,+std::allocator%3Cint%3E%3E%26):',treeid:0),l:'5',n:'0',o:'CFG+x86-64+clang+22.1.0+(Editor+%231,+Compiler+%233)',t:'0'),(h:output,i:(compilerName:'x86-64+clang+22.1.0',editorid:1,fontScale:14,fontUsePx:'0',j:3,wrap:'1'),l:'5',n:'0',o:'Output+of+x86-64+clang+22.1.0+(Compiler+%233)',t:'0')),header:(),k:56.70539820866619,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4). Even 2D stencils are out because [look at this](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjE/lykAA6oCoRODB7evv5JKWkCIWGRLDFxZgl2mA7pQgRMxASZPn4BldUCtfUEhRHRsfG2dQ1N2a1D3aG9Jf3lAJS2qF7EyOwc5gDMocjeWADUJutuAG5VRMQH2CYaAIIbWzuY%2B4fICgToWFQXV7c3APS/uzMABFdgBWAC0yVCBF2r0YyDouwA1rEwrRdhAgkxEgYEYZdgCEJgmDDMABHLwk9KwggAT3os2%2B/12iwIJlBFjw7KB7Is2m5TxBoV5XNBPI52nBXAF1l2wo5ovFfOs0rF%2B0scoYIql3N5/LVsvlnJVuolAvBu0kACojYq9bqbkdUHh0DT4XRQRA0AxXrsqLRUCSrbsAPoh4iYV7EPAOMOa0jfXZJ5Mp1Op/2BgjBsMRqMxghx1kJm5p0ul17oEAgVIAL0wIZh4WL1zLreTFartfrMIAsoybiYAOxWEvJ/jEDEd6t4OsNuWC3bS9YWecHNy7cK7C1LlfWax4Wb7YeJ0vjydvTsz7u7bQLnc3p7rntbxcHXeWazaQ9Dkcttssrw2QVXZg2fWV9RBA4eVHf9kyNCA8BfLhD1A9UVwg5NmQYEgCAQE9YMNLUOQQtDFxQ3YwI1DCk2ZBRWTwmD/0IkUQIo0iIFvbdGTVGiAQAd0jNlGLbZjgNQ2UONI5CBV43ZiVefD/wtSQADoNCoVjbVYyj0N1ZcCQBFZBFiRSUyHaC/yTczvnMjh5loThQV4PwOC0UhUE4Nw9w1OilhWdV1h4UgCE0Oz5iREB1lUgBOLgzAADlBSQNHWDRQQ0LgNGi/ROEkZzQvczheAUEANGC0L5jgWAkDQFhEjoWJyEoWr6voOJtkMYAzHKMqaFoAhYhKiAogKqJQnqWlOCCsbmGIWkAHkom0U4pt4Wq2EEeaGFoSbXN4LAoi8YA3DEWgSu4fbMBYTrxD20h8AjaoTnOtzMFUKpANWILoUwBy7toPAomICaPCwAqCGjFhVtIE5iCiFJMCBK6btCUA9vmf0mGABQADU8EwPj5sSRhof4QQRDEdgpBkQRFBUdQ7t0dZ9E6lBvJsAGohKyB5lQRJHAEc7wQrKDTA/SwzHWLdruWPD1iBGsGFhyQt3m9ZeFQWHoywbmIHmNoBb8CBXBGPwEmCSZilKPRklSQ3TZtvJDZ6K3%2BgqX7ThqcYHfd%2BxDc6BoXb6OIKm9zxmj0V4uiD6YQ/1xZlip%2BzHPyu6PI4XZVHigA2cFs5VjqjEBMwVK4NSMVwQgSAC5DeBC9HSAgGqqGAJqvUYAbiESeoO/OoKWoa4hwlYVYs9z/PdkL4Bi9LtTeEwfAzhdPQmdIWbiFQPiIcwX6mFpVloYNheADEvAYdoXLhc%2BPWoAMSUnwWs1IP076f3Yz9SYAwldAMjGfj%2B8BfwXrsX%2BwBZicGChGTAy8NDJw4E5NeBV05uGPgAcUzjnPOBcDBF26rPDQFdF7Vw2AkXYHg6qDwCusWYdcKrzCJEwLAcQ9akAitnUEal4qDikKCaK2doqSGivFaKAQ/p5UQWnIqtg9D1y0LMOBZhU5uXTrQ9G8xYapGcJIIAA%3D%3D%3D "2D five-point stencil on Compiler Explorer"). So, I
 settled on `std::copy_if`.
 
-Implementing a SIMD implementation is the easy part. Figuring its perforamnce
+Implementing a SIMD implementation is the easy part. Figuring its performance
 out ended up being less trivial than I anticipated. I already knew the tools
 that I will need.
 
@@ -70,11 +70,11 @@ distributed input in the range (-1000,1000) results in an expected 50% of the
 input values being copied over.
 
 The entropy is not orthogonal to the distribution, but it's worth mentioning
-separately. Perhaps I need to think of a better name too. This deterines how
+separately. Perhaps I need to think of a better name too. This determines how
 predictable the input is, because all pipelined CPUs have branch-prediction
 logic. E.g. if the CPU frontend (FE) finds a conditional jump instruction, it will
 not wait for its operand to be ready and will instead speculatively jump to a
-target address. Misspeculation reults in a large penalty requiring a complete
+target address. Misspeculation results in a large penalty requiring a complete
 pipeline flush and restarting execution. The same predicate and distribution
 combination as above can make it difficult for most branch predictors to have a
 high branch-miss-rate, thereby adversely affecting throughput.
@@ -277,7 +277,7 @@ and the uop cache [^zen4-loop-buffer-disabled]. The backend receives uops from
 the uop queue whenever it has resources available to begin executing an
 instruction.
 
-A piece of code is said to be **fronted bound** if during a good majority of
+A piece of code is said to be **frontend bound** if during a good majority of
 cycles the backend is ready to receive uops, but the FE has placed any
 uops in the uop queue. Typical causes of FE boundedness include high iTLB
 and L1i-cache miss rates, high uop cache miss rates etc.
@@ -322,9 +322,9 @@ they are not reverted if it turned out to be a misspeculation. Let's just dive
 right in and see what this looks like.
 
 ### Level 1
-Yasin also proposes a performance counter architecture that is motivated is
+Yasin also proposes a performance counter architecture that is
 designed in a top-down manner in order to facilitate diagnosis of realistic
-bottlenecks (TODO: use the paper's language). And would you look at that, Zen 4
+bottlenecks. And would you look at that, Zen 4
 already has the nececessary hardware events and groups corresponding level 1 of the
 hierarchy ({{<figref pmc-hierarchy>}}) groups defined for us. From `perf list`:
 
@@ -575,7 +575,7 @@ inaccuracies like [_skid_](https://easyperf.net/blog/2018/08/29/Understanding-pe
 instead of the hot instruction actually causing trouble.
 
 AMD introduced hardware for instruction based sampling (IBS)[^amd-ibs] in their
-CPUs.  IBS hardware periodically selects an operation based on a precondigured
+CPUs.  IBS hardware periodically selects an operation based on a preconfigured
 sampling period.  The tagged operation is then monitored as it proceeds through
 the pipeline, and events triggered by the tagged operation are recorded. On
 completion of the operation, its event information is reported to the profiler.
@@ -764,11 +764,11 @@ hardcoded:
 5. The overall implementation of `copy_if` in general
 
 There are multiple ways of implementing a SIMD version of `copy_if`,
-specifically the implementation of `compress_store` at two of them. The former
-is incredibly shit on Zen 4, but it should hold up just fine on comparable Intel
-microarchitectures and on Zen 5. Other implementations, that were mentioned a
-CppCon talk [^cppcon-advanced-simd-algos] by one of the co-authors of EVE,
-include:
+specifically the last part of the loop, i.e. a `compress_store`. We looked at
+two implementations of it. The former is incredibly shit on Zen 4, but it should
+hold up just fine on comparable Intel microarchitectures and on Zen 5. Other
+implementations, that were mentioned a CppCon talk [^cppcon-advanced-simd-algos]
+by one of the co-authors of EVE, include:
 
 1. [Tiny lookup
    tables](https://stackoverflow.com/questions/45506309/efficient-sse-shuffle-mask-generation-for-left-packing-byte-elements/45515947#45515947)
