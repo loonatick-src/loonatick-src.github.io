@@ -120,9 +120,8 @@ of the SIMD registers. E.g. in
 AVX-512 for loading 32-bit values, `N = 512/32 = 16`.
 
 1. Load into a SIMD register from `&input[i]`
-   - `_mm512_loadu_epi32` and friends (TODO: add link to Intel intrinsics reference)
-2. Evalute predicate on SIMD register to get a SIMD mask value (TODO: add
-   footnote about masks)
+   - `_mm512_loadu_epi32` and friends.
+2. Evalute predicate on SIMD register to get a SIMD mask value.
    - For our predicate (`>(0)`), `const auto zero = _mm512_setzero_epi32();
       return _mm512_cmpgt_epi32_mask(a, zero);`
 3. Contiguously store the SIMD lanes for whom the corresponding mask bit is 1.
