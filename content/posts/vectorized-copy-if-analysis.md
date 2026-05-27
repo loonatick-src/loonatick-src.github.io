@@ -773,8 +773,8 @@ by one of the co-authors of EVE, include:
 1. [Tiny lookup
    tables](https://stackoverflow.com/questions/45506309/efficient-sse-shuffle-mask-generation-for-left-packing-byte-elements/45515947#45515947)
    by aqrit on stackoverflow.
-2. [Using BMI2 intrinsics](https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask) (by Peter Cordes, prolific stackoverflow user)
-3. Switch + shuffle by @Z Boson on stackoverflow [^zboson-pending]
+2. [Using BMI2 intrinsics](https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask) by Peter Cordes, prolific stackoverflow user.
+3. [Switch + shuffle](https://stackoverflow.com/a/36965322/13389627) by Z Boson on stackoverflow.
 
 Some of these will be faster than others depending on the platform, predicate,
 and the input distribution. Some, including the straightforward AVX512
@@ -1048,4 +1048,3 @@ Instruction Info:
 [^amd-ibs]: [Instruction-Based Sampling: A New Performance
 Analysis Technique for AMD Family 10h Processors](www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdfgg)
 [^cppcon-advanced-simd-algos]: [Advanced SIMD Algorithms in Pictures - Denis Yaroshevskiy](https://youtu.be/YolkGP-rb3U?si=0FUJ6C7-ev6Z94Vi&t=800)
-[^zboson-pending]: Still looking for this one, please let me know if you know which StackOverflow answer this refers to.
