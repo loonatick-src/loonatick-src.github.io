@@ -774,7 +774,7 @@ by one of the co-authors of EVE, include:
    tables](https://stackoverflow.com/questions/45506309/efficient-sse-shuffle-mask-generation-for-left-packing-byte-elements/45515947#45515947)
    by aqrit on stackoverflow.
 2. [Using BMI2 intrinsics](https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask) by Peter Cordes, prolific stackoverflow user.
-3. [Switch + shuffle](https://stackoverflow.com/a/36965322/13389627) by Z Boson on stackoverflow.
+3. [Switch + shuffle](https://stackoverflow.com/a/36965322/13389627) by Z Boson on stackoverflow (thank you aqrit for pointing me towards this).
 
 Some of these will be faster than others depending on the platform, predicate,
 and the input distribution. Some, including the straightforward AVX512
