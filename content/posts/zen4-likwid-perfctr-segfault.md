@@ -17,7 +17,7 @@ programming reference manual is fun, especially when it straight-up lies to you 
 Just like `perf stat`, `likwid-perfctr` prints all the PMU events available on
 your platform using the flag `-e`. My CPU is a Ryzen 7 255, a (somewhat odd) Zen
 4 uarch. `likwid-perfctr -e` appeared to run fine on the first invocation after
-a cold reboot, but segfaulted on on subsequent invocations.
+a cold reboot, but segfaulted on subsequent invocations.
 
 I opened an issue on the project's GitHub, and the issue template very helpfully
 pointed me towards the `-V3` command line option that prints very verbose debug
@@ -66,7 +66,7 @@ Hmmm...
 The maintainer responding to my issue said that he will have to look at the AMD
 docs to verify the DFC counter information for Zen 4. I decided to go looking on
 my own. The first step of course is to determine which manual my CPU corresponds
-to. The kind of documentation that we are looking for is called a Processor
+to. The kind of documentation we are looking for is called a Processor
 Programming Reference (PPR) in AMD docs. Unfortunately there is no document
 titled "Ryzen 7 255 Processor Programming Reference". Instead, they are named
 something like "Processor Programming Reference (PPR) for AMD Family 1Ah Model
@@ -104,7 +104,7 @@ julia> UInt8(25)
 ```
 
 The "h" suffix in the PPR name means hexadecimal. So, we are looking for a document that looks like
-"Processor Programming Reference (PPR) for AMD Family 19h Model 75h". On looking up on docs.amd.com,
+"Processor Programming Reference (PPR) for AMD Family 19h Model 75h". Looking it up on docs.amd.com,
 I found the document "[Processor Programming Reference (PPR) for AMD Family 19h Model **70h**](https://docs.amd.com/v/u/en-US/57019-A0-PUB_3.00)", which actually covers models 70h-77h. Per this manual,
 there should be 16 DFCs available.
 
@@ -215,14 +215,14 @@ Hmmmmmmmmm...
  There were two problems.
 
 1. The PPR for this model and family states that there are 16 DF PMCs. As it
-   happens, most (I don't know what fraction exactly) Zen 4 CPUs follow this.
+   happens, most consumer Zen 4 desktop CPUs follow this.
    This is why the counter map in for Zen 4 in likwid-perfctr was (reasonably)
    fixed to have 16 DF PMCs.
 2. The CPUID_Fn80000022 leaf exists only for some AMD Zen variants [^maintainer-comoment].
 
 I reported all this information to the maintainer, and they have fixed this for Zen4/4c/5
 by changing the DFC count to be determined dynamically using CPUID like they were already
-doing for UMCs.
+doing for UMCs; it now correctly reports 4 DFCs on my machine.
 
 [^intro-hyperbole]: I am being hyperbolic here of course, it's all in good humour.
 [^maintainer-comoment]: https://github.com/RRZE-HPC/likwid/issues/744#issuecomment-4459685441
