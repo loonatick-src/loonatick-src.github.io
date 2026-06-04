@@ -1,7 +1,7 @@
 ---
 date: '2026-06-04T15:51:33+02:00'
 draft: false
-title: 'Zen4 Likwid Perfctr Segfault'
+title: 'Counting Counters on Zen 4: An Error in the Manual Caused a Segfault'
 ---
 
 # Introduction
