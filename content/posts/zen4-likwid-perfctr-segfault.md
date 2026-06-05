@@ -1,7 +1,7 @@
 ---
 date: '2026-06-04T15:51:33+02:00'
 draft: false
-title: 'Counting Counters on Zen 4: An Error in the Manual Caused a Segfault'
+title: 'Counting Counters on Zen 4: Identifying the Cause of a Segfault using my CPU's Manual'
 ---
 
 # Introduction
@@ -11,7 +11,7 @@ to use [likwid-perfctr](https://github.com/rrze-hpc/likwid/wiki/likwid-perfctr) 
 of [perf-stat](https://man7.org/linux/man-pages/man1/perf-stat.1.html). `likwid-perfctr -e`
 segfaulted on my machine. This article goes into how I triaged this issue and reported it
 to the LIKWID devs. It was "fun" in the way that having to open your CPU's processor
-programming reference manual is fun, especially when it straight-up lies to you [^intro-hyperbole].
+programming reference manual is fun.
 
 # The Crash
 Just like `perf stat`, `likwid-perfctr` prints all the PMU events available on
@@ -106,13 +106,12 @@ julia> UInt8(25)
 The "h" suffix in the PPR name means hexadecimal. So, we are looking for a document that looks like
 "Processor Programming Reference (PPR) for AMD Family 19h Model 75h". Looking it up on docs.amd.com,
 I found the document "[Processor Programming Reference (PPR) for AMD Family 19h Model **70h**](https://docs.amd.com/v/u/en-US/57019-A0-PUB_3.00)", which actually covers models 70h-77h. Per this manual,
-there should be 16 DFCs available.
+there should be 16 independent counters for DF events that can be configured simultaneously.
 
 {{<fig key="amd-ppr-dfc-list" src="/images/amd-ppr-dfc-list.png"
-caption="List of DF PMCs according to the PPR."
 >}}
 
-Hmmmmmm...
+Note that all 16 of these are shared across all cores.
 
 # Checking using cpuid and inline asm
 The manual very helpfully shows how to verify the DFC count.
@@ -130,9 +129,11 @@ in eax, and sometimes ecx as well.
 The second table (`CPUID_Fn80000022_EBX`) shows that bits [15:10] of the `ebx`
 register should contain the number of available data fabric counters when the
 `cpuid` instruction is invoked with `0x80000022` is passed in the eax register
-(from the function name). The eax and ecx registers for the same function report
-support for LBR V2 and Performance Monitoring V2 support, and active UMC
-information respectively.
+(from the function name). It also very helpfully states that this value is fixed
+at 0x4. Which explains the output of `likwid-perfctr -e` and the subsequent
+segfault. The eax and ecx registers for the same function report support for LBR
+V2 and Performance Monitoring V2 support, and active UMC information
+respectively.
 
 We can use this information to figure things out for ourselves using a simple program.
 
@@ -211,18 +212,17 @@ ECX breakdown:
 This reports that there are 4 DF PMCs, which matches with the debug output of `likwid-perfctr -e`.
 Hmmmmmmmmm...
 
-# Conclusion
- There were two problems.
-
-1. The PPR for this model and family states that there are 16 DF PMCs. As it
-   happens, most consumer Zen 4 desktop CPUs follow this.
-   This is why the counter map in for Zen 4 in likwid-perfctr was (reasonably)
-   fixed to have 16 DF PMCs.
-2. The CPUID_Fn80000022 leaf exists only for some AMD Zen variants [^maintainer-comoment].
-
+# Conclusion and Follow Up
 I reported all this information to the maintainer, and they have fixed this for Zen4/4c/5
 by changing the DFC count to be determined dynamically using CPUID like they were already
 doing for UMCs; it now correctly reports 4 DFCs on my machine.
 
-[^intro-hyperbole]: I am being hyperbolic here of course, it's all in good humour.
+However, there is still a lot that I do not understand. My goal was just to get
+`likwid-perfctr` working, but how exactly do I reconcile the apparent
+discrepancy between {{<figref amd-ppr-dfc-list>}} and {{<figref
+amd-ppr-dfc-cpuid>}}? I'll have to dig into section 2.1.8 on register sharing,
+and also better understand non general-purpose registers (GPRs) like
+model-specific registers (MSRs), and how to directly interact with them at the
+lowest level.
+
 [^maintainer-comoment]: https://github.com/RRZE-HPC/likwid/issues/744#issuecomment-4459685441
