@@ -1,7 +1,7 @@
 ---
 date: '2026-06-04T15:51:33+02:00'
 draft: false
-title: 'Counting Counters on Zen 4: Identifying the Cause of a Segfault using my CPU's Manual'
+title: "Counting Counters on Zen 4: Identifying the Cause of a Segfault using my CPU's Manual"
 ---
 
 # Introduction
